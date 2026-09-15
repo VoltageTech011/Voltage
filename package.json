@@ -1,0 +1,19 @@
+{
+  "name": "voltage",
+  "version": "1.0.0",
+  "description": "Voltage WhatsApp AI system by Thereal_VoltageLord",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pino": "^9.6.0"
+  }
+}
