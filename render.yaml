@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: voltage
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: OWNER_NAME
+        value: Thereal_VoltageLord
+      - key: VOLTAGE_NAME
+        value: Voltage
+      - key: PREFIX
+        value: .
+      - key: VERSION
+        value: 1.0.0
+      - key: MODE
+        value: private
