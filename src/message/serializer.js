@@ -296,6 +296,22 @@ class VoltageMessage {
         );
     }
 
+    async edit(
+        content,
+        options = {}
+    ) {
+        return this.sock.sendMessage(
+            this.from,
+            {
+                text: String(content)
+            },
+            {
+                edit: this.key,
+                ...options
+            }
+        );
+    }
+
     async react(emoji) {
         return this.sock.sendMessage(
             this.from,
