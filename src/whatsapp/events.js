@@ -2,52 +2,99 @@ const {
     dispatchMessage
 } = require("../message/dispatcher");
 
-function registerWhatsAppEvents(sock) {
+async function registerWhatsAppEvents(sock) {
+    if (!sock) {
+        throw new Error(
+            "Cannot register events without a WhatsApp socket."
+        );
+    }
+
     sock.ev.on(
         "messages.upsert",
-        async ({ messages, type }) => {
-            if (type !== "notify") {
-                return;
-            }
+        async (event) => {
+            try {
+                const messages =
+                    event?.messages || [];
 
-            for (const raw of messages) {
-                try {
-                    await dispatchMessage(
-                        sock,
-                        raw
-                    );
-                } catch (error) {
-                    console.error(
-                        "[Voltage] Message processing error:",
-                        error.message
-                    );
+                if (!messages.length) {
+                    return;
                 }
+
+                console.log(
+                    `[Voltage] Received ${messages.length} WhatsApp message(s).`
+                );
+
+                for (const raw of messages) {
+                    try {
+                        if (!raw?.message) {
+                            continue;
+                        }
+
+                        console.log(
+                            `[Voltage] Processing message ${raw.key?.id || "unknown"}`
+                        );
+
+                        await dispatchMessage(
+                            sock,
+                            raw
+                        );
+                    } catch (error) {
+                        console.error(
+                            "[Voltage] Message processing error:",
+                            error
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error(
+                    "[Voltage] messages.upsert error:",
+                    error
+                );
             }
         }
     );
 
     sock.ev.on(
         "messages.update",
-        async (updates) => {
+        updates => {
+            if (!Array.isArray(updates)) {
+                return;
+            }
+
             for (const update of updates) {
-                if (
-                    update.update?.status
-                ) {
-                    continue;
-                }
+                console.log(
+                    `[Voltage] Message update: ${
+                        update?.key?.id ||
+                        "unknown"
+                    }`
+                );
             }
         }
     );
 
     sock.ev.on(
-        "group-participants.update",
-        async (update) => {
+        "messages.delete",
+        update => {
             console.log(
-                "[Voltage] Group participant event:",
-                update.action,
-                update.id
+                "[Voltage] Message deletion event."
             );
         }
+    );
+
+    sock.ev.on(
+        "group-participants.update",
+        update => {
+            console.log(
+                `[Voltage] Group participant event: ${
+                    update?.action ||
+                    "unknown"
+                } ${update?.id || ""}`
+            );
+        }
+    );
+
+    console.log(
+        "[Voltage] WhatsApp message events registered."
     );
 }
 
