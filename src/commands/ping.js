@@ -4,21 +4,36 @@ const {
 
 module.exports = {
     name: "ping",
-    aliases: [],
-    description: "Check Voltage response time.",
+
+    aliases: [
+        "p"
+    ],
+
+    description:
+        "Check if Voltage is online.",
+
+    usage:
+        ".ping",
 
     async execute(message) {
-        const started =
+        const start =
             Date.now();
 
-        await reply(
-            message,
-            "Pong."
-        );
+        const sent =
+            await reply(
+                message,
+                "Pong."
+            );
 
-        const elapsed =
-            Date.now() - started;
+        const latency =
+            Date.now() - start;
 
-        return elapsed;
+        if (sent?.key) {
+            console.log(
+                `[Voltage] Ping response: ${latency}ms`
+            );
+        }
+
+        return sent;
     }
 };
