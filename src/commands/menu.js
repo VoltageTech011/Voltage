@@ -65,29 +65,32 @@ module.exports = {
         ".menu",
 
     async execute(message) {
-        const groupCommands = getCommands([
-            "tagall",
-            "promote",
-            "demote",
-            "kick",
-            "del",
-            "warn",
-            "add",
-            "leave",
-            "open",
-            "close"
-        ]);
+        const groupCommands =
+            getCommands([
+                "tagall",
+                "tagadmin",
+                "promote",
+                "demote",
+                "kick",
+                "del",
+                "warn",
+                "add",
+                "leave",
+                "open",
+                "close"
+            ]);
 
-        const systemCommands = getCommands([
-            "menu",
-            "help",
-            "ping",
-            "about",
-            "owner",
-            "pair",
-            "private",
-            "public"
-        ]);
+        const systemCommands =
+            getCommands([
+                "menu",
+                "help",
+                "ping",
+                "about",
+                "owner",
+                "pair",
+                "private",
+                "public"
+            ]);
 
         const commandCount =
             registry.size();
@@ -95,10 +98,7 @@ module.exports = {
         const owner =
             process.env.MENU_OWNER ||
             process.env.OWNER_NAME ||
-            "Thereal_voltagelord0";
-
-        const prefix =
-            process.env.PREFIX || ".";
+            "Thereal_VoltageLord";
 
         const mode =
             process.env.MODE ||
@@ -113,17 +113,21 @@ module.exports = {
             formatRuntime();
 
         const lines = [
-            "╭┈───〔 VOLTAGE ASSISTANT 〕┈───⊷",
-            `├✦ Owner: ${owner}`,
-            `├✦ Commands: ${commandCount}`,
-            `├✦ Runtime: ${runtime}`,
-            `├✦ Prefix: ${prefix}`,
-            `├✦ Mode: ${mode}`,
-            `├✦ Version: ${version}`,
-            "╰───────────────────⊷",
+            "╭───────「 ⚡ VOLTAGE 」───────╮",
+            "│                             │",
+            "│  PERSONAL AI SYSTEM         │",
+            "│                             │",
+            "│  STATUS    : ● ONLINE       │",
+            `│  VERSION   : ${version.padEnd(12)}│`,
+            `│  COMMANDS  : ${String(commandCount).padEnd(12)}│`,
+            `│  UPTIME    : ${runtime.padEnd(12)}│`,
+            `│  MODE      : ${mode.toUpperCase().padEnd(12)}│`,
+            "│                             │",
+            "╰─────────────────────────────╯",
             "",
-            "`『 GROUP 』`",
-            "╭───────────────────⊷"
+            "`『 GROUP OPERATIONS 』`",
+            "",
+            "╭─────────────────────────────╮"
         ];
 
         for (const command of groupCommands) {
@@ -133,10 +137,11 @@ module.exports = {
         }
 
         lines.push(
-            "╰───────────────────⊷",
+            "╰─────────────────────────────╯",
             "",
             "`『 SYSTEM 』`",
-            "╭───────────────────⊷"
+            "",
+            "╭─────────────────────────────╮"
         );
 
         for (const command of systemCommands) {
@@ -146,14 +151,32 @@ module.exports = {
         }
 
         lines.push(
-            "╰───────────────────⊷",
+            "╰─────────────────────────────╯",
+            "",
+            "╭──────「 CORE STATUS 」───────╮",
+            "│                             │",
+            "│  ⚡ Core Engine    ONLINE    │",
+            "│  ◉ WhatsApp       CONNECTED │",
+            `│  ◇ Plugins        ${String(commandCount).padEnd(3)} LOADED │`,
+            `│  ◈ Runtime        ${runtime.padEnd(11)}│`,
+            "│                             │",
+            "╰─────────────────────────────╯",
+            "",
+            "> `Don't just use it. Watch it evolve.`",
             "",
             "> *©️ Powered by Thereal_VoltageLord*"
         );
 
         return reply(
             message,
-            lines.join("\n")
+            lines.join("\n"),
+            {
+                footer: false
+            }
         );
     }
 };
+
+One deliberate change: I used "footer: false" because the menu already contains the exact footer. That prevents "response.js" from appending it a second time.
+
+Also, your previous menu omitted "tagadmin" from the actual group list despite having it in your planned command set, so I included it here.
