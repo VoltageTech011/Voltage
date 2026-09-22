@@ -6,6 +6,10 @@ const {
     shouldRespond
 } = require("./triggers");
 
+const {
+    dispatchCommand
+} = require("../plugins/dispatcher");
+
 async function dispatchMessage(sock, raw) {
     const message =
         await serializeMessage(
@@ -40,6 +44,17 @@ async function dispatchMessage(sock, raw) {
 
     message.command =
         trigger.command || null;
+
+    if (message.command) {
+        const handled =
+            await dispatchCommand(
+                message
+            );
+
+        if (handled) {
+            return message;
+        }
+    }
 
     return message;
 }
