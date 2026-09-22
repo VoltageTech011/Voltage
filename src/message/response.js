@@ -49,7 +49,9 @@ async function send(
     content,
     options = {}
 ) {
-    if (typeof content === "string") {
+    if (
+        typeof content === "string"
+    ) {
         const finalContent =
             options.footer === false
                 ? content
