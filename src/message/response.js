@@ -1,5 +1,5 @@
 const FOOTER =
-    "Powered by Thereal_VoltageLord";
+    "> *©️ Powered by Thereal_VoltageLord*";
 
 function withFooter(text) {
     const content =
@@ -12,7 +12,9 @@ function withFooter(text) {
     if (
         content
             .toLowerCase()
-            .includes(FOOTER.toLowerCase())
+            .includes(
+                "powered by thereal_voltagelord"
+            )
     ) {
         return content;
     }
@@ -20,18 +22,48 @@ function withFooter(text) {
     return `${content}\n\n${FOOTER}`;
 }
 
-async function reply(message, text, options = {}) {
+async function reply(
+    message,
+    text,
+    options = {}
+) {
+    const content =
+        options.footer === false
+            ? String(text ?? "").trim()
+            : withFooter(text);
+
+    const cleanOptions = {
+        ...options
+    };
+
+    delete cleanOptions.footer;
+
     return message.reply(
-        withFooter(text),
-        options
+        content,
+        cleanOptions
     );
 }
 
-async function send(message, content, options = {}) {
+async function send(
+    message,
+    content,
+    options = {}
+) {
     if (typeof content === "string") {
+        const finalContent =
+            options.footer === false
+                ? content
+                : withFooter(content);
+
+        const cleanOptions = {
+            ...options
+        };
+
+        delete cleanOptions.footer;
+
         return message.send(
-            withFooter(content),
-            options
+            finalContent,
+            cleanOptions
         );
     }
 
@@ -41,7 +73,32 @@ async function send(message, content, options = {}) {
     );
 }
 
-async function react(message, emoji) {
+async function edit(
+    message,
+    text,
+    options = {}
+) {
+    const content =
+        options.footer === false
+            ? String(text ?? "").trim()
+            : withFooter(text);
+
+    const cleanOptions = {
+        ...options
+    };
+
+    delete cleanOptions.footer;
+
+    return message.edit(
+        content,
+        cleanOptions
+    );
+}
+
+async function react(
+    message,
+    emoji
+) {
     return message.react(emoji);
 }
 
@@ -50,5 +107,6 @@ module.exports = {
     withFooter,
     reply,
     send,
+    edit,
     react
 };
