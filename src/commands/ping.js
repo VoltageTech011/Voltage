@@ -36,12 +36,12 @@ module.exports = {
                 }
             );
 
-        const latency =
-            Date.now() - start;
-
         if (!sent?.key) {
             return sent;
         }
+
+        const latency =
+            Date.now() - start;
 
         const wait =
             ms =>
@@ -57,6 +57,7 @@ module.exports = {
 
         await edit(
             message,
+            sent,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -74,6 +75,7 @@ module.exports = {
 
         await edit(
             message,
+            sent,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -90,9 +92,7 @@ module.exports = {
 
         await wait(700);
 
-        const result =
-            await edit(
-                message,
+        const finalText =
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -103,7 +103,13 @@ module.exports = {
 │  LATENCY  : ${latency} ms   │
 │  CORE     : 100% ✓          │
 │                             │
-└─────────────────────────────┘`
+└─────────────────────────────┘`;
+
+        const result =
+            await edit(
+                message,
+                sent,
+                finalText
             );
 
         console.log(
