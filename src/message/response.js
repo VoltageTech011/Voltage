@@ -77,9 +77,22 @@ async function send(
 
 async function edit(
     message,
+    sent,
     text,
     options = {}
 ) {
+    if (!message?.sock) {
+        throw new Error(
+            "Cannot edit message: socket unavailable."
+        );
+    }
+
+    if (!sent?.key) {
+        throw new Error(
+            "Cannot edit message: message key unavailable."
+        );
+    }
+
     const content =
         options.footer === false
             ? String(text ?? "").trim()
@@ -91,9 +104,15 @@ async function edit(
 
     delete cleanOptions.footer;
 
-    return message.edit(
-        content,
-        cleanOptions
+    return message.sock.sendMessage(
+        message.from,
+        {
+            text: content
+        },
+        {
+            edit: sent.key,
+            ...cleanOptions
+        }
     );
 }
 
