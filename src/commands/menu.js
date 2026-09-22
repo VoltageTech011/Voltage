@@ -50,7 +50,7 @@ function getCommands(names) {
 }
 
 function formatCommand(command) {
-    return `┋ ⬡ ${command.name}`;
+    return `│  ┋ ⬡ ${command.name}`;
 }
 
 module.exports = {
@@ -86,13 +86,24 @@ module.exports = {
         const systemCommands =
             getCommands([
                 "menu",
-                "help",
                 "ping",
+                "status",
                 "about",
                 "owner",
                 "pair",
                 "private",
-                "public"
+                "public",
+                "mode",
+                "setprefix",
+                "whoami",
+                "vault",
+                "trace",
+                "protocol"
+            ]);
+
+        const funCommands =
+            getCommands([
+                "rps"
             ]);
 
         const commandCount =
@@ -123,7 +134,7 @@ module.exports = {
             "│                           │",
             "│   PERSONAL AI SYSTEM      │",
             "│                           │",
-            `│   STATUS   : ● ONLINE     │`,
+            "│   STATUS   : ● ONLINE     │",
             `│   OWNER    : ${owner}`,
             `│   COMMANDS : ${commandCount}`,
             `│   RUNTIME  : ${runtime}`,
@@ -137,12 +148,18 @@ module.exports = {
             "╭───────────────────────────╮"
         ];
 
-        for (
-            const command
-            of groupCommands
-        ) {
+        if (groupCommands.length) {
+            for (
+                const command
+                of groupCommands
+            ) {
+                lines.push(
+                    formatCommand(command)
+                );
+            }
+        } else {
             lines.push(
-                formatCommand(command)
+                "│  ┋ No group commands loaded"
             );
         }
 
@@ -165,6 +182,28 @@ module.exports = {
         lines.push(
             "╰───────────────────────────╯",
             "",
+            "`『 FUN // ARENA 』`",
+            "╭───────────────────────────╮"
+        );
+
+        if (funCommands.length) {
+            for (
+                const command
+                of funCommands
+            ) {
+                lines.push(
+                    formatCommand(command)
+                );
+            }
+        } else {
+            lines.push(
+                "│  ┋ No games loaded"
+            );
+        }
+
+        lines.push(
+            "╰───────────────────────────╯",
+            "",
             "╭──────「 CORE STATUS 」─────╮",
             "│                           │",
             "│  ⚡ Core Engine : ONLINE  │",
@@ -174,17 +213,12 @@ module.exports = {
             "│                           │",
             "╰───────────────────────────╯",
             "",
-            "> `Don't just use it. Watch it evolve.`",
-            "",
-            "> *©️ Powered by Thereal_VoltageLord*"
+            "> `Don't just use it. Watch it evolve.`"
         );
 
         return reply(
             message,
-            lines.join("\n"),
-            {
-                footer: false
-            }
+            lines.join("\n")
         );
     }
 };
