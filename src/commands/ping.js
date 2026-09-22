@@ -1,5 +1,6 @@
 const {
-    reply
+    reply,
+    edit
 } = require("../message/response");
 
 module.exports = {
@@ -10,7 +11,7 @@ module.exports = {
     ],
 
     description:
-        "Check if Voltage is online.",
+        "Check Voltage's connection latency.",
 
     usage:
         ".ping",
@@ -22,18 +23,92 @@ module.exports = {
         const sent =
             await reply(
                 message,
-                "Pong."
+`┌─[ VOLTAGE // CORE ]─────────┐
+│                             │
+│  > initializing core...     │
+│  > loading network...       │
+│                             │
+│  CORE  [██░░░░░░░░] 25%     │
+│                             │
+└─────────────────────────────┘`,
+                {
+                    footer: false
+                }
             );
 
         const latency =
             Date.now() - start;
 
-        if (sent?.key) {
-            console.log(
-                `[Voltage] Ping response: ${latency}ms`
-            );
+        if (!sent?.key) {
+            return sent;
         }
 
-        return sent;
+        const wait =
+            (ms) =>
+                new Promise(
+                    resolve =>
+                        setTimeout(resolve, ms)
+                );
+
+        await wait(700);
+
+        await edit(
+            sent,
+`┌─[ VOLTAGE // CORE ]─────────┐
+│                             │
+│  > initializing core... OK  │
+│  > loading network...       │
+│                             │
+│  CORE  [█████░░░░░░] 50%    │
+│                             │
+└─────────────────────────────┘`
+        );
+
+        await wait(700);
+
+        await edit(
+            sent,
+`┌─[ VOLTAGE // CORE ]─────────┐
+│                             │
+│  > initializing core... OK  │
+│  > network handshake... OK  │
+│  > measuring response...    │
+│                             │
+│  CORE  [████████░░░░] 75%   │
+│                             │
+└─────────────────────────────┘`
+        );
+
+        await wait(700);
+
+        const finalText =
+`┌─[ VOLTAGE // CORE ]─────────┐
+│                             │
+│  > initializing core... OK  │
+│  > network handshake... OK  │
+│  > response received... OK  │
+│                             │
+│  STATUS   : ONLINE          │
+│  LATENCY  : ${latency} ms   │
+│  CORE     : 100% ✓          │
+│                             │
+└─────────────────────────────┘
+
+> *©️ Powered by Thereal_VoltageLord*`;
+
+        const result =
+            await edit(
+                sent,
+                finalText,
+                {
+                    footer: false
+                }
+            );
+
+        console.log(
+            `[Voltage] Ping response: ${latency}ms`
+        );
+
+        return result;
     }
 };
