@@ -44,16 +44,19 @@ module.exports = {
         }
 
         const wait =
-            (ms) =>
+            ms =>
                 new Promise(
                     resolve =>
-                        setTimeout(resolve, ms)
+                        setTimeout(
+                            resolve,
+                            ms
+                        )
                 );
 
         await wait(700);
 
         await edit(
-            sent,
+            message,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -61,13 +64,16 @@ module.exports = {
 │                             │
 │  CORE  [█████░░░░░░] 50%    │
 │                             │
-└─────────────────────────────┘`
+└─────────────────────────────┘`,
+            {
+                footer: false
+            }
         );
 
         await wait(700);
 
         await edit(
-            sent,
+            message,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -76,12 +82,17 @@ module.exports = {
 │                             │
 │  CORE  [████████░░░░] 75%   │
 │                             │
-└─────────────────────────────┘`
+└─────────────────────────────┘`,
+            {
+                footer: false
+            }
         );
 
         await wait(700);
 
-        const finalText =
+        const result =
+            await edit(
+                message,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -92,17 +103,7 @@ module.exports = {
 │  LATENCY  : ${latency} ms   │
 │  CORE     : 100% ✓          │
 │                             │
-└─────────────────────────────┘
-
-> *©️ Powered by Thereal_VoltageLord*`;
-
-        const result =
-            await edit(
-                sent,
-                finalText,
-                {
-                    footer: false
-                }
+└─────────────────────────────┘`
             );
 
         console.log(
