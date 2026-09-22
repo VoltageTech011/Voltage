@@ -81,9 +81,9 @@ async function edit(
     text,
     options = {}
 ) {
-    if (!message?.sock) {
+    if (!message?.edit) {
         throw new Error(
-            "Cannot edit message: socket unavailable."
+            "Cannot edit message: edit method unavailable."
         );
     }
 
@@ -104,15 +104,10 @@ async function edit(
 
     delete cleanOptions.footer;
 
-    return message.sock.sendMessage(
-        message.from,
-        {
-            text: content
-        },
-        {
-            edit: sent.key,
-            ...cleanOptions
-        }
+    return message.edit(
+        sent.key,
+        content,
+        cleanOptions
     );
 }
 
