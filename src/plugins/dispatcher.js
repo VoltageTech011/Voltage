@@ -5,45 +5,86 @@ const {
     reply
 } = require("../message/response");
 
-async function dispatchCommand(message) {
+const {
+    resolveCommand
+} = require("../utils/commandResolver");
+
+async function dispatchCommand(
+    message
+) {
     const command =
-        message.command;
+        message?.command;
 
     if (!command?.name) {
         return false;
     }
 
-    const plugin =
-        registry.get(command.name);
+    let plugin =
+        registry.get(
+            command.name
+        );
 
     if (!plugin) {
+        const result =
+            resolveCommand(
+                command.name,
+                registry
+            );
+
+        if (
+            result?.type ===
+            "suggestion"
+        ) {
+            return reply(
+                message,
+                `Unknown command: \`${command.name}\`\n\nDid you mean \`${result.name}\`?`
+            );
+        }
+
+        if (
+            result?.type ===
+            "possible"
+        ) {
+            const suggestions =
+                result.alternatives
+                    .map(
+                        item =>
+                            `\`${item.name}\``
+                    )
+                    .join(", ");
+
+            return reply(
+                message,
+                `Unknown command: \`${command.name}\`\n\nPossible matches: ${suggestions}`
+            );
+        }
+
         return false;
     }
 
     try {
-        await plugin.execute(
+        return await plugin.execute(
             message,
             {
-                args: command.args || [],
+                args:
+                    command.args || [],
+
                 rawArgs:
                     command.rawArgs || "",
-                command: command.name
+
+                command
             }
         );
-
-        return true;
     } catch (error) {
         console.error(
             `[Voltage] Command "${command.name}" failed:`,
             error
         );
 
-        await reply(
+        return reply(
             message,
-            "Something went wrong while running that command."
+            "Something went wrong while executing that command."
         );
-
-        return true;
     }
 }
 
