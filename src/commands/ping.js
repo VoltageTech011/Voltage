@@ -92,7 +92,10 @@ module.exports = {
 
         await wait(700);
 
-        const finalText =
+        const result =
+            await edit(
+                message,
+                sent,
 `┌─[ VOLTAGE // CORE ]─────────┐
 │                             │
 │  > initializing core... OK  │
@@ -103,13 +106,7 @@ module.exports = {
 │  LATENCY  : ${latency} ms   │
 │  CORE     : 100% ✓          │
 │                             │
-└─────────────────────────────┘`;
-
-        const result =
-            await edit(
-                message,
-                sent,
-                finalText
+└─────────────────────────────┘`
             );
 
         console.log(
