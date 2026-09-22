@@ -297,18 +297,23 @@ class VoltageMessage {
     }
 
     async edit(
+        messageKey,
         content,
         options = {}
     ) {
+        if (!messageKey) {
+            throw new Error(
+                "Cannot edit message: message key unavailable."
+            );
+        }
+
         return this.sock.sendMessage(
             this.from,
             {
-                text: String(content)
+                text: String(content),
+                edit: messageKey
             },
-            {
-                edit: this.key,
-                ...options
-            }
+            options
         );
     }
 
