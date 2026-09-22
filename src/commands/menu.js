@@ -42,7 +42,10 @@ function formatRuntime() {
 
 function getCommands(names) {
     return names
-        .map(name => registry.get(name))
+        .map(
+            name =>
+                registry.get(name)
+        )
         .filter(Boolean);
 }
 
@@ -100,6 +103,9 @@ module.exports = {
             process.env.OWNER_NAME ||
             "Thereal_VoltageLord";
 
+        const prefix =
+            process.env.PREFIX || ".";
+
         const mode =
             process.env.MODE ||
             process.env.BOT_MODE ||
@@ -113,54 +119,60 @@ module.exports = {
             formatRuntime();
 
         const lines = [
-            "╭───────「 ⚡ VOLTAGE 」───────╮",
-            "│                             │",
-            "│  PERSONAL AI SYSTEM         │",
-            "│                             │",
-            "│  STATUS    : ● ONLINE       │",
-            `│  VERSION   : ${version.padEnd(12)}│`,
-            `│  COMMANDS  : ${String(commandCount).padEnd(12)}│`,
-            `│  UPTIME    : ${runtime.padEnd(12)}│`,
-            `│  MODE      : ${mode.toUpperCase().padEnd(12)}│`,
-            "│                             │",
-            "╰─────────────────────────────╯",
+            "╭──────「 ⚡ VOLTAGE 」──────╮",
+            "│                           │",
+            "│   PERSONAL AI SYSTEM      │",
+            "│                           │",
+            `│   STATUS   : ● ONLINE     │`,
+            `│   OWNER    : ${owner}`,
+            `│   COMMANDS : ${commandCount}`,
+            `│   RUNTIME  : ${runtime}`,
+            `│   PREFIX   : ${prefix}`,
+            `│   MODE     : ${mode}`,
+            `│   VERSION  : ${version}`,
+            "│                           │",
+            "╰───────────────────────────╯",
             "",
             "`『 GROUP OPERATIONS 』`",
-            "",
-            "╭─────────────────────────────╮"
+            "╭───────────────────────────╮"
         ];
 
-        for (const command of groupCommands) {
+        for (
+            const command
+            of groupCommands
+        ) {
             lines.push(
                 formatCommand(command)
             );
         }
 
         lines.push(
-            "╰─────────────────────────────╯",
+            "╰───────────────────────────╯",
             "",
             "`『 SYSTEM 』`",
-            "",
-            "╭─────────────────────────────╮"
+            "╭───────────────────────────╮"
         );
 
-        for (const command of systemCommands) {
+        for (
+            const command
+            of systemCommands
+        ) {
             lines.push(
                 formatCommand(command)
             );
         }
 
         lines.push(
-            "╰─────────────────────────────╯",
+            "╰───────────────────────────╯",
             "",
-            "╭──────「 CORE STATUS 」───────╮",
-            "│                             │",
-            "│  ⚡ Core Engine    ONLINE    │",
-            "│  ◉ WhatsApp       CONNECTED │",
-            `│  ◇ Plugins        ${String(commandCount).padEnd(3)} LOADED │`,
-            `│  ◈ Runtime        ${runtime.padEnd(11)}│`,
-            "│                             │",
-            "╰─────────────────────────────╯",
+            "╭──────「 CORE STATUS 」─────╮",
+            "│                           │",
+            "│  ⚡ Core Engine : ONLINE  │",
+            "│  ◉ WhatsApp    : ACTIVE   │",
+            `│  ◇ Plugins     : ${commandCount} LOADED`,
+            `│  ◈ Runtime     : ${runtime}`,
+            "│                           │",
+            "╰───────────────────────────╯",
             "",
             "> `Don't just use it. Watch it evolve.`",
             "",
@@ -176,7 +188,3 @@ module.exports = {
         );
     }
 };
-
-One deliberate change: I used "footer: false" because the menu already contains the exact footer. That prevents "response.js" from appending it a second time.
-
-Also, your previous menu omitted "tagadmin" from the actual group list despite having it in your planned command set, so I included it here.
