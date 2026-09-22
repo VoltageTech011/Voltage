@@ -2,188 +2,1375 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
-    <title>Voltage — WhatsApp Pairing</title>
+
+    <meta
+        name="theme-color"
+        content="#050505"
+    >
+
+    <title>Voltage — WhatsApp Gateway</title>
 
     <style>
         * {
             box-sizing: border-box;
         }
 
+        :root {
+            --bg: #050505;
+            --panel: #0b0b0b;
+            --panel-2: #101010;
+            --border: #202020;
+            --border-light: #2c2c2c;
+            --text: #f5f5f5;
+            --muted: #777;
+            --dim: #4d4d4d;
+            --white: #fff;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
+            background:
+                radial-gradient(
+                    circle at 50% -20%,
+                    #181818 0%,
+                    #090909 35%,
+                    #050505 70%
+                );
+            color: var(--text);
+            font-family:
+                Inter,
+                Arial,
+                Helvetica,
+                sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 28px 14px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: .035;
+            background-image:
+                linear-gradient(
+                    #fff 1px,
+                    transparent 1px
+                ),
+                linear-gradient(
+                    90deg,
+                    #fff 1px,
+                    transparent 1px
+                );
+            background-size: 40px 40px;
+        }
+
+        .app {
+            width: min(100%, 460px);
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand {
+            text-align: center;
+            margin: 8px 0 24px;
+        }
+
+        .logo {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 14px;
+            border: 1px solid #303030;
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #080808;
-            color: #f2f2f2;
-            font-family: Arial, sans-serif;
+            background: #0d0d0d;
+            box-shadow:
+                0 0 0 6px rgba(255,255,255,.015),
+                0 18px 45px rgba(0,0,0,.5);
+            font-size: 25px;
+            font-weight: 900;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 29px;
+            letter-spacing: 4px;
+            font-weight: 900;
+        }
+
+        .brand p {
+            margin: 7px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         .card {
-            width: min(92%, 430px);
-            padding: 32px;
-            border: 1px solid #242424;
-            border-radius: 18px;
-            background: #101010;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            background: rgba(11,11,11,.94);
+            box-shadow:
+                0 25px 80px rgba(0,0,0,.55),
+                inset 0 1px rgba(255,255,255,.025);
+            overflow: hidden;
         }
 
-        h1 {
-            margin: 0 0 8px;
-            font-size: 32px;
+        .card-head {
+            padding: 20px 20px 18px;
+            border-bottom: 1px solid #181818;
         }
 
-        p {
-            color: #929292;
-            line-height: 1.5;
+        .head-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
 
-        input,
-        button {
-            width: 100%;
-            height: 48px;
-            border-radius: 10px;
-            font-size: 15px;
+        .gateway-title {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 9px;
+            border: 1px solid #252525;
+            border-radius: 999px;
+            color: #aaa;
+            background: #090909;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #555;
+            box-shadow: 0 0 0 3px rgba(255,255,255,.025);
+        }
+
+        .status-dot.online {
+            background: #fff;
+            box-shadow:
+                0 0 10px rgba(255,255,255,.5);
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 9px;
+            color: #aaa;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .input-wrap {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border-light);
+            border-radius: 13px;
+            background: #060606;
+            overflow: hidden;
+            transition: border-color .2s;
+        }
+
+        .input-wrap:focus-within {
+            border-color: #555;
+        }
+
+        .prefix {
+            padding-left: 14px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 700;
         }
 
         input {
-            padding: 0 14px;
-            margin: 12px 0;
-            border: 1px solid #2c2c2c;
-            outline: none;
-            background: #080808;
+            width: 100%;
+            height: 49px;
+            padding: 0 14px 0 7px;
+            border: 0;
+            outline: 0;
+            background: transparent;
             color: white;
+            font-size: 15px;
+            letter-spacing: .5px;
+        }
+
+        input::placeholder {
+            color: #414141;
         }
 
         button {
+            width: 100%;
+            height: 49px;
+            margin-top: 11px;
             border: 0;
-            background: white;
-            color: black;
-            font-weight: 700;
+            border-radius: 13px;
+            background: #f4f4f4;
+            color: #050505;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: .7px;
             cursor: pointer;
+            transition:
+                transform .15s,
+                opacity .15s;
+        }
+
+        button:active {
+            transform: scale(.985);
+        }
+
+        button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .pairing {
+            margin-top: 18px;
+            padding: 18px;
+            border: 1px solid #202020;
+            border-radius: 16px;
+            background: #080808;
+            text-align: center;
+        }
+
+        .pairing-label {
+            color: #666;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         .code {
-            margin-top: 22px;
-            padding: 18px;
-            border: 1px dashed #333;
-            border-radius: 12px;
-            text-align: center;
+            min-height: 43px;
+            margin: 9px 0 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f5f5f5;
             font-size: 28px;
-            font-weight: 800;
+            font-weight: 900;
             letter-spacing: 5px;
+            font-family:
+                monospace;
         }
 
-        .status {
-            margin-top: 16px;
-            font-size: 14px;
-            color: #aaa;
+        .copy {
+            margin: 0;
+            height: 42px;
+            background: #111;
+            color: #ddd;
+            border: 1px solid #292929;
+        }
+
+        .copy:hover {
+            background: #171717;
+        }
+
+        .pipeline {
+            margin-top: 18px;
+            padding: 17px;
+            border: 1px solid #1b1b1b;
+            border-radius: 16px;
+            background: #080808;
+        }
+
+        .section-title {
+            margin-bottom: 14px;
+            color: #666;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+        }
+
+        .step {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-height: 30px;
+            color: #444;
+            font-size: 12px;
+        }
+
+        .step:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 17px;
+            width: 1px;
+            height: 17px;
+            background: #1e1e1e;
+        }
+
+        .step-dot {
+            width: 9px;
+            height: 9px;
+            flex: 0 0 9px;
+            border: 1px solid #333;
+            border-radius: 50%;
+            background: #0b0b0b;
+            z-index: 1;
+        }
+
+        .step.active {
+            color: #ddd;
+        }
+
+        .step.active .step-dot {
+            background: #ddd;
+            border-color: #ddd;
+            box-shadow:
+                0 0 10px rgba(255,255,255,.35);
+        }
+
+        .step.done {
+            color: #777;
+        }
+
+        .step.done .step-dot {
+            background: #777;
+            border-color: #777;
+        }
+
+        .log {
+            margin-top: 18px;
+            padding: 15px;
+            border: 1px solid #1b1b1b;
+            border-radius: 16px;
+            background: #050505;
+            font-family: monospace;
+            font-size: 10px;
+            line-height: 1.8;
+            color: #666;
+            min-height: 91px;
+            max-height: 150px;
+            overflow: auto;
+        }
+
+        .log-line {
+            white-space: pre-wrap;
+        }
+
+        .log-line::before {
+            content: "> ";
+            color: #444;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .stat {
+            padding: 13px;
+            border: 1px solid #1b1b1b;
+            border-radius: 13px;
+            background: #080808;
+        }
+
+        .stat-name {
+            color: #555;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            margin-top: 6px;
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .instructions {
+            margin-top: 18px;
+            border-top: 1px solid #191919;
+            padding-top: 18px;
+        }
+
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+            color: #777;
+            font-size: 11px;
+            line-height: 2;
+        }
+
+        .instructions strong {
+            color: #bbb;
+        }
+
+        .footer {
+            padding: 16px 20px;
+            border-top: 1px solid #181818;
+            color: #4f4f4f;
+            text-align: center;
+            font-size: 10px;
+            letter-spacing: .5px;
+        }
+
+        .footer strong {
+            color: #777;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .success {
+            text-align: center;
+            padding: 25px 10px;
+        }
+
+        .success-icon {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            box-shadow:
+                0 0 25px rgba(255,255,255,.06);
+        }
+
+        .success h2 {
+            margin: 0;
+            font-size: 21px;
+        }
+
+        .success p {
+            margin: 7px 0 0;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .number {
+            margin-top: 13px;
+            color: #bbb;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .reset {
+            margin-top: 18px;
+            background: #111;
+            color: #bbb;
+            border: 1px solid #282828;
+        }
+
+        @media (max-width: 380px) {
+            .content,
+            .card-head {
+                padding: 16px;
+            }
+
+            .brand h1 {
+                font-size: 25px;
+            }
+
+            .code {
+                font-size: 24px;
+            }
         }
     </style>
 </head>
 
 <body>
+
+<div class="app">
+
+    <header class="brand">
+        <div class="logo">⚡</div>
+
+        <h1>VOLTAGE</h1>
+
+        <p>WhatsApp Gateway</p>
+    </header>
+
     <main class="card">
-        <h1>Voltage</h1>
 
-        <p>
-            Connect the Voltage WhatsApp session using
-            an 8-character pairing code.
-        </p>
+        <div class="card-head">
+            <div class="head-row">
 
-        <input
-            id="number"
-            type="tel"
-            placeholder="2348012345678"
-            autocomplete="off"
-        >
+                <div class="gateway-title">
+                    Session Control
+                </div>
 
-        <button onclick="pair()">
-            Generate Pairing Code
-        </button>
+                <div class="status-pill">
+                    <span
+                        id="statusDot"
+                        class="status-dot"
+                    ></span>
 
-        <div id="code" class="code">
-            --------
+                    <span id="topStatus">
+                        Offline
+                    </span>
+                </div>
+
+            </div>
         </div>
 
-        <div id="status" class="status">
-            Checking Voltage...
+        <div class="content">
+
+            <section id="pairSection">
+
+                <label
+                    class="label"
+                    for="number"
+                >
+                    WhatsApp Number
+                </label>
+
+                <div class="input-wrap">
+
+                    <span class="prefix">
+                        +
+                    </span>
+
+                    <input
+                        id="number"
+                        type="tel"
+                        inputmode="numeric"
+                        placeholder="2348012345678"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+                <button
+                    id="pairButton"
+                    onclick="pair()"
+                >
+                    GENERATE PAIRING CODE
+                </button>
+
+                <div
+                    id="pairingBox"
+                    class="pairing hidden"
+                >
+
+                    <div class="pairing-label">
+                        Pairing Code
+                    </div>
+
+                    <div
+                        id="code"
+                        class="code"
+                    >
+                        --------
+                    </div>
+
+                    <button
+                        id="copyButton"
+                        class="copy"
+                        onclick="copyCode()"
+                        disabled
+                    >
+                        COPY CODE
+                    </button>
+
+                </div>
+
+            </section>
+
+            <section class="pipeline">
+
+                <div class="section-title">
+                    Connection Pipeline
+                </div>
+
+                <div
+                    id="stepStarting"
+                    class="step active"
+                >
+                    <span class="step-dot"></span>
+                    <span>Gateway initialized</span>
+                </div>
+
+                <div
+                    id="stepPairing"
+                    class="step"
+                >
+                    <span class="step-dot"></span>
+                    <span>Waiting for pairing</span>
+                </div>
+
+                <div
+                    id="stepAuth"
+                    class="step"
+                >
+                    <span class="step-dot"></span>
+                    <span>Authenticating session</span>
+                </div>
+
+                <div
+                    id="stepConnecting"
+                    class="step"
+                >
+                    <span class="step-dot"></span>
+                    <span>Connecting to WhatsApp</span>
+                </div>
+
+                <div
+                    id="stepConnected"
+                    class="step"
+                >
+                    <span class="step-dot"></span>
+                    <span>Voltage online</span>
+                </div>
+
+            </section>
+
+            <section class="log">
+
+                <div
+                    id="logs"
+                >
+                    <div class="log-line">
+                        Voltage Core initialized
+                    </div>
+
+                    <div class="log-line">
+                        WhatsApp gateway ready
+                    </div>
+
+                </div>
+
+            </section>
+
+            <section class="dashboard">
+
+                <div class="stat">
+
+                    <div class="stat-name">
+                        Gateway
+                    </div>
+
+                    <div
+                        id="gatewayValue"
+                        class="stat-value"
+                    >
+                        ONLINE
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-name">
+                        Session
+                    </div>
+
+                    <div
+                        id="sessionValue"
+                        class="stat-value"
+                    >
+                        READY
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-name">
+                        Version
+                    </div>
+
+                    <div
+                        id="versionValue"
+                        class="stat-value"
+                    >
+                        1.0.0
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-name">
+                        Runtime
+                    </div>
+
+                    <div
+                        id="runtimeValue"
+                        class="stat-value"
+                    >
+                        --
+                    </div>
+
+                </div>
+
+            </section>
+
+            <section class="instructions">
+
+                <div class="section-title">
+                    How to connect
+                </div>
+
+                <ol>
+                    <li>
+                        Open <strong>WhatsApp</strong>.
+                    </li>
+
+                    <li>
+                        Go to
+                        <strong>Linked Devices</strong>.
+                    </li>
+
+                    <li>
+                        Select
+                        <strong>Link with phone number</strong>.
+                    </li>
+
+                    <li>
+                        Enter the pairing code above.
+                    </li>
+
+                    <li>
+                        Wait for
+                        <strong>Voltage Online</strong>.
+                    </li>
+                </ol>
+
+            </section>
+
+            <section
+                id="success"
+                class="success hidden"
+            >
+
+                <div class="success-icon">
+                    ✓
+                </div>
+
+                <h2>
+                    Voltage Online
+                </h2>
+
+                <p>
+                    WhatsApp session successfully connected.
+                </p>
+
+                <div
+                    id="connectedNumber"
+                    class="number"
+                >
+                    WhatsApp
+                </div>
+
+                <button
+                    class="reset"
+                    onclick="location.reload()"
+                >
+                    REFRESH SESSION
+                </button>
+
+            </section>
+
         </div>
+
+        <footer class="footer">
+            © Powered by
+            <strong>Thereal_VoltageLord</strong>
+        </footer>
+
     </main>
 
-    <script>
-        async function pair() {
-            const number =
-                document.getElementById("number").value.trim();
+</div>
 
-            const status =
-                document.getElementById("status");
+<script>
+    let currentCode = "";
 
-            const code =
-                document.getElementById("code");
+    let polling = null;
 
-            status.textContent = "Generating pairing code...";
-            code.textContent = "--------";
+    const steps = {
+        starting:
+            document.getElementById(
+                "stepStarting"
+            ),
 
-            try {
-                const response = await fetch(
+        pairing:
+            document.getElementById(
+                "stepPairing"
+            ),
+
+        auth:
+            document.getElementById(
+                "stepAuth"
+            ),
+
+        connecting:
+            document.getElementById(
+                "stepConnecting"
+            ),
+
+        connected:
+            document.getElementById(
+                "stepConnected"
+            )
+    };
+
+    function addLog(text) {
+        const logs =
+            document.getElementById("logs");
+
+        const line =
+            document.createElement("div");
+
+        line.className =
+            "log-line";
+
+        line.textContent =
+            text;
+
+        logs.appendChild(line);
+
+        logs.scrollTop =
+            logs.scrollHeight;
+    }
+
+    function setPipeline(state) {
+        const order = [
+            "starting",
+            "pairing",
+            "auth",
+            "connecting",
+            "connected"
+        ];
+
+        const index =
+            order.indexOf(state);
+
+        order.forEach(
+            (name, position) => {
+                const step =
+                    steps[name];
+
+                step.classList.remove(
+                    "active",
+                    "done"
+                );
+
+                if (position < index) {
+                    step.classList.add("done");
+                }
+
+                if (position === index) {
+                    step.classList.add("active");
+                }
+            }
+        );
+    }
+
+    function setTopStatus(
+        text,
+        online = false
+    ) {
+        document.getElementById(
+            "topStatus"
+        ).textContent = text;
+
+        document.getElementById(
+            "statusDot"
+        ).classList.toggle(
+            "online",
+            online
+        );
+    }
+
+    function normalizeState(state) {
+        return String(
+            state || ""
+        )
+            .toLowerCase()
+            .replace(/[\s_-]+/g, "");
+    }
+
+    function updateState(data) {
+        if (!data) {
+            return;
+        }
+
+        const state =
+            normalizeState(data.state);
+
+        const number =
+            data.number ||
+            data.phone ||
+            data.jid ||
+            "";
+
+        if (
+            state === "connected" ||
+            state === "online"
+        ) {
+            setPipeline("connected");
+
+            setTopStatus(
+                "Online",
+                true
+            );
+
+            document.getElementById(
+                "gatewayValue"
+            ).textContent =
+                "CONNECTED";
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                "ACTIVE";
+
+            if (number) {
+                document.getElementById(
+                    "connectedNumber"
+                ).textContent =
+                    number;
+            }
+
+            document.getElementById(
+                "pairSection"
+            ).classList.add(
+                "hidden"
+            );
+
+            document.getElementById(
+                "success"
+            ).classList.remove(
+                "hidden"
+            );
+
+            addLog(
+                "WhatsApp session established"
+            );
+
+            addLog(
+                "Voltage is now online"
+            );
+
+            return;
+        }
+
+        if (
+            state === "pairing" ||
+            state === "waitingforpairing"
+        ) {
+            setPipeline("pairing");
+
+            setTopStatus(
+                "Pairing",
+                false
+            );
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                "PAIRING";
+
+            return;
+        }
+
+        if (
+            state === "authenticating" ||
+            state === "auth"
+        ) {
+            setPipeline("auth");
+
+            setTopStatus(
+                "Authenticating",
+                false
+            );
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                "AUTH";
+
+            return;
+        }
+
+        if (
+            state === "connecting" ||
+            state === "open"
+        ) {
+            setPipeline("connecting");
+
+            setTopStatus(
+                "Connecting",
+                false
+            );
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                "CONNECTING";
+
+            return;
+        }
+
+        if (
+            state === "disconnected" ||
+            state === "loggedout" ||
+            state === "failed"
+        ) {
+            setPipeline("starting");
+
+            setTopStatus(
+                state,
+                false
+            );
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                state.toUpperCase();
+
+            return;
+        }
+
+        if (state) {
+            setTopStatus(
+                state,
+                false
+            );
+        }
+    }
+
+    async function pair() {
+        const input =
+            document.getElementById(
+                "number"
+            );
+
+        const button =
+            document.getElementById(
+                "pairButton"
+            );
+
+        const pairingBox =
+            document.getElementById(
+                "pairingBox"
+            );
+
+        const codeElement =
+            document.getElementById(
+                "code"
+            );
+
+        const copyButton =
+            document.getElementById(
+                "copyButton"
+            );
+
+        const number =
+            input.value
+                .replace(/\D/g, "")
+                .trim();
+
+        if (!number) {
+            setTopStatus(
+                "Number required"
+            );
+
+            addLog(
+                "No WhatsApp number provided"
+            );
+
+            input.focus();
+
+            return;
+        }
+
+        button.disabled = true;
+
+        button.textContent =
+            "GENERATING...";
+
+        pairingBox.classList.remove(
+            "hidden"
+        );
+
+        codeElement.textContent =
+            "••••••••";
+
+        copyButton.disabled =
+            true;
+
+        setPipeline("starting");
+
+        setTopStatus(
+            "Starting",
+            false
+        );
+
+        addLog(
+            "Pairing request started"
+        );
+
+        try {
+            const response =
+                await fetch(
                     "/api/whatsapp/pair",
                     {
                         method: "POST",
                         headers: {
-                            "Content-Type": "application/json"
+                            "Content-Type":
+                                "application/json"
                         },
-                        body: JSON.stringify({ number })
+                        body:
+                            JSON.stringify({
+                                number
+                            })
                     }
                 );
 
-                const data = await response.json();
+            const data =
+                await response.json();
 
-                if (!response.ok) {
-                    throw new Error(
-                        data.error || "Pairing failed."
-                    );
-                }
-
-                code.textContent =
-                    data.code || "--------";
-
-                status.textContent =
-                    "Enter this code in WhatsApp → Linked Devices.";
-            } catch (error) {
-                status.textContent =
-                    error.message;
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Pairing request failed."
+                );
             }
+
+            currentCode =
+                data.code || "";
+
+            if (!currentCode) {
+                throw new Error(
+                    "No pairing code was returned."
+                );
+            }
+
+            codeElement.textContent =
+                currentCode;
+
+            copyButton.disabled =
+                false;
+
+            button.textContent =
+                "PAIRING CODE GENERATED";
+
+            setPipeline("pairing");
+
+            setTopStatus(
+                "Pairing",
+                false
+            );
+
+            document.getElementById(
+                "sessionValue"
+            ).textContent =
+                "WAITING";
+
+            addLog(
+                "Pairing code generated"
+            );
+
+            addLog(
+                "Waiting for WhatsApp authentication"
+            );
+
+            startPolling();
+
+        } catch (error) {
+            button.disabled =
+                false;
+
+            button.textContent =
+                "GENERATE PAIRING CODE";
+
+            codeElement.textContent =
+                "--------";
+
+            copyButton.disabled =
+                true;
+
+            setTopStatus(
+                "Error",
+                false
+            );
+
+            addLog(
+                error.message
+            );
+        }
+    }
+
+    async function copyCode() {
+        if (!currentCode) {
+            return;
         }
 
-        async function refreshStatus() {
-            try {
-                const response =
-                    await fetch("/api/whatsapp");
+        const button =
+            document.getElementById(
+                "copyButton"
+            );
 
-                const data =
-                    await response.json();
+        try {
+            await navigator.clipboard.writeText(
+                currentCode
+            );
 
-                if (data.state === "connected") {
-                    document.getElementById("status")
-                        .textContent =
-                        `Connected: ${data.number || "WhatsApp"}`;
-                } else if (data.state) {
-                    document.getElementById("status")
-                        .textContent =
-                        `Voltage: ${data.state}`;
-                }
-            } catch {}
+            button.textContent =
+                "✓ COPIED";
+
+            setTimeout(() => {
+                button.textContent =
+                    "COPY CODE";
+            }, 1800);
+
+        } catch {
+            button.textContent =
+                "COPY FAILED";
+
+            setTimeout(() => {
+                button.textContent =
+                    "COPY CODE";
+            }, 1800);
+        }
+    }
+
+    function startPolling() {
+        if (polling) {
+            clearInterval(polling);
         }
 
         refreshStatus();
 
-        setInterval(refreshStatus, 3000);
-    </script>
+        polling =
+            setInterval(
+                refreshStatus,
+                2500
+            );
+    }
+
+    async function refreshStatus() {
+        try {
+            const response =
+                await fetch(
+                    "/api/whatsapp",
+                    {
+                        cache: "no-store"
+                    }
+                );
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data =
+                await response.json();
+
+            updateState(data);
+
+            if (
+                String(data.state || "")
+                    .toLowerCase() ===
+                "connected"
+            ) {
+                if (polling) {
+                    clearInterval(polling);
+                    polling = null;
+                }
+            }
+
+        } catch {
+            setTopStatus(
+                "Gateway unavailable",
+                false
+            );
+        }
+    }
+
+    async function loadInitialStatus() {
+        try {
+            const response =
+                await fetch(
+                    "/api/whatsapp",
+                    {
+                        cache: "no-store"
+                    }
+                );
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data =
+                await response.json();
+
+            updateState(data);
+
+        } catch {
+            setTopStatus(
+                "Offline",
+                false
+            );
+        }
+    }
+
+    document
+        .getElementById("number")
+        .addEventListener(
+            "keydown",
+            event => {
+                if (
+                    event.key === "Enter"
+                ) {
+                    pair();
+                }
+            }
+        );
+
+    loadInitialStatus();
+
+    setInterval(
+        loadInitialStatus,
+        5000
+    );
+</script>
+
 </body>
 </html>
