@@ -14,7 +14,9 @@ const {
 } = require("./permissions");
 
 function getMessageContent(message) {
-    if (!message) return null;
+    if (!message) {
+        return null;
+    }
 
     return (
         message.ephemeralMessage?.message ||
@@ -26,39 +28,69 @@ function getMessageContent(message) {
 }
 
 function getMessageType(message) {
-    if (!message) return null;
+    if (!message) {
+        return null;
+    }
 
-    if (message.conversation) return "text";
+    if (message.conversation) {
+        return "text";
+    }
 
-    if (message.extendedTextMessage) return "extendedText";
+    if (message.extendedTextMessage) {
+        return "extendedText";
+    }
 
-    if (message.imageMessage) return "image";
+    if (message.imageMessage) {
+        return "image";
+    }
 
-    if (message.videoMessage) return "video";
+    if (message.videoMessage) {
+        return "video";
+    }
 
-    if (message.audioMessage) return "audio";
+    if (message.audioMessage) {
+        return "audio";
+    }
 
-    if (message.documentMessage) return "document";
+    if (message.documentMessage) {
+        return "document";
+    }
 
-    if (message.stickerMessage) return "sticker";
+    if (message.stickerMessage) {
+        return "sticker";
+    }
 
-    if (message.contactMessage) return "contact";
+    if (message.contactMessage) {
+        return "contact";
+    }
 
-    if (message.contactsArrayMessage) return "contacts";
+    if (message.contactsArrayMessage) {
+        return "contacts";
+    }
 
-    if (message.locationMessage) return "location";
+    if (message.locationMessage) {
+        return "location";
+    }
 
-    if (message.liveLocationMessage) return "liveLocation";
+    if (message.liveLocationMessage) {
+        return "liveLocation";
+    }
 
-    if (message.reactionMessage) return "reaction";
+    if (message.reactionMessage) {
+        return "reaction";
+    }
 
-    if (message.pollCreationMessage) return "poll";
+    if (message.pollCreationMessage) {
+        return "poll";
+    }
 
     return "unknown";
 }
 
 function extractText(message) {
-    if (!message) return "";
+    if (!message) {
+        return "";
+    }
 
     return (
         message.conversation ||
@@ -73,12 +105,24 @@ function extractText(message) {
     ).trim();
 }
 
+function getContextInfo(message) {
+    if (!message) {
+        return null;
+    }
+
+    return (
+        message.extendedTextMessage?.contextInfo ||
+        message.imageMessage?.contextInfo ||
+        message.videoMessage?.contextInfo ||
+        message.documentMessage?.contextInfo ||
+        message.stickerMessage?.contextInfo ||
+        null
+    );
+}
+
 function getQuotedMessage(message) {
     const context =
-        message?.extendedTextMessage?.contextInfo ||
-        message?.imageMessage?.contextInfo ||
-        message?.videoMessage?.contextInfo ||
-        message?.documentMessage?.contextInfo;
+        getContextInfo(message);
 
     if (!context?.quotedMessage) {
         return null;
@@ -94,12 +138,20 @@ function getQuotedMessage(message) {
 
 function getMentions(message) {
     const context =
-        message?.extendedTextMessage?.contextInfo ||
-        message?.imageMessage?.contextInfo ||
-        message?.videoMessage?.contextInfo ||
-        message?.documentMessage?.contextInfo;
+        getContextInfo(message);
 
     return context?.mentionedJid || [];
+}
+
+function getMimetype(message) {
+    return (
+        message?.imageMessage?.mimetype ||
+        message?.videoMessage?.mimetype ||
+        message?.audioMessage?.mimetype ||
+        message?.documentMessage?.mimetype ||
+        message?.stickerMessage?.mimetype ||
+        null
+    );
 }
 
 class VoltageMessage {
@@ -107,52 +159,60 @@ class VoltageMessage {
         this.sock = sock;
         this.raw = raw;
 
-        const key = raw.key || {};
-        const content = getMessageContent(
-            raw.message
-        );
+        const key =
+            raw?.key || {};
+
+        const content =
+            getMessageContent(
+                raw?.message
+            );
 
         this.key = key;
 
-        this.id = key.id || null;
+        this.id =
+            key.id || null;
 
-        this.from = normalizeJid(
-            key.remoteJid
-        );
+        this.from =
+            normalizeJid(
+                key.remoteJid
+            );
 
-        this.sender = normalizeJid(
-            key.participant ||
-            key.remoteJid
-        );
+        this.sender =
+            normalizeJid(
+                key.participant ||
+                key.remoteJid
+            );
 
         this.senderNumber =
-            getNumberFromJid(this.sender);
+            getNumberFromJid(
+                this.sender
+            );
 
         this.senderResolved =
             this.senderNumber;
 
         this.pushName =
-            raw.pushName || null;
+            raw?.pushName || null;
 
-        this.body = content;
+        this.body =
+            content;
 
-        this.text = extractText(content);
+        this.text =
+            extractText(content);
 
-        this.type = getMessageType(content);
+        this.type =
+            getMessageType(content);
 
         this.mimetype =
-            content?.imageMessage?.mimetype ||
-            content?.videoMessage?.mimetype ||
-            content?.audioMessage?.mimetype ||
-            content?.documentMessage?.mimetype ||
-            content?.stickerMessage?.mimetype ||
-            null;
+            getMimetype(content);
 
-        this.isGroup = isGroupJid(this.from);
+        this.isGroup =
+            isGroupJid(
+                this.from
+            );
 
-        this.isFromMe = Boolean(
-            key.fromMe
-        );
+        this.isFromMe =
+            Boolean(key.fromMe);
 
         this.mentions =
             getMentions(content);
@@ -161,12 +221,23 @@ class VoltageMessage {
             getQuotedMessage(content);
 
         this.isOwner =
-            isOwner(this.sender);
+            isOwner(
+                this.sender
+            );
 
         this.isDev =
-            isDev(this.sender);
+            isDev(
+                this.sender
+            );
 
-        this.groupMetadata = null;
+        this.groupMetadata =
+            null;
+
+        this.trigger =
+            null;
+
+        this.command =
+            null;
     }
 
     async loadGroupMetadata() {
@@ -186,7 +257,10 @@ class VoltageMessage {
         }
     }
 
-    async reply(content, options = {}) {
+    async reply(
+        content,
+        options = {}
+    ) {
         return this.sock.sendMessage(
             this.from,
             {
@@ -199,7 +273,10 @@ class VoltageMessage {
         );
     }
 
-    async send(content, options = {}) {
+    async send(
+        content,
+        options = {}
+    ) {
         let message;
 
         if (
@@ -231,7 +308,9 @@ class VoltageMessage {
         );
     }
 
-    async forward(jid = this.from) {
+    async forward(
+        jid = this.from
+    ) {
         return this.sock.sendMessage(
             jid,
             {
@@ -251,19 +330,32 @@ class VoltageMessage {
         let type;
 
         if (this.body.imageMessage) {
-            media = this.body.imageMessage;
+            media =
+                this.body.imageMessage;
             type = "image";
-        } else if (this.body.videoMessage) {
-            media = this.body.videoMessage;
+        } else if (
+            this.body.videoMessage
+        ) {
+            media =
+                this.body.videoMessage;
             type = "video";
-        } else if (this.body.audioMessage) {
-            media = this.body.audioMessage;
+        } else if (
+            this.body.audioMessage
+        ) {
+            media =
+                this.body.audioMessage;
             type = "audio";
-        } else if (this.body.documentMessage) {
-            media = this.body.documentMessage;
+        } else if (
+            this.body.documentMessage
+        ) {
+            media =
+                this.body.documentMessage;
             type = "document";
-        } else if (this.body.stickerMessage) {
-            media = this.body.stickerMessage;
+        } else if (
+            this.body.stickerMessage
+        ) {
+            media =
+                this.body.stickerMessage;
             type = "sticker";
         }
 
@@ -281,21 +373,34 @@ class VoltageMessage {
 
         const chunks = [];
 
-        for await (const chunk of stream) {
+        for await (
+            const chunk of stream
+        ) {
             chunks.push(chunk);
         }
 
-        return Buffer.concat(chunks);
+        return Buffer.concat(
+            chunks
+        );
     }
 }
 
-async function serializeMessage(sock, raw) {
-    if (!raw?.message) {
+async function serializeMessage(
+    sock,
+    raw
+) {
+    if (
+        !raw?.message ||
+        !raw?.key
+    ) {
         return null;
     }
 
     const message =
-        new VoltageMessage(sock, raw);
+        new VoltageMessage(
+            sock,
+            raw
+        );
 
     if (message.isGroup) {
         await message.loadGroupMetadata();
@@ -309,5 +414,7 @@ module.exports = {
     serializeMessage,
     getMessageContent,
     extractText,
-    getMessageType
+    getMessageType,
+    getQuotedMessage,
+    getMentions
 };
