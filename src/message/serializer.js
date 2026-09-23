@@ -13,112 +13,188 @@ const {
     isDev
 } = require("./permissions");
 
-function getMessageContent(message) {
+
+function unwrapMessage(message) {
     if (!message) {
         return null;
     }
 
-    return (
-        message.ephemeralMessage?.message ||
-        message.viewOnceMessage?.message ||
-        message.viewOnceMessageV2?.message ||
-        message.documentWithCaptionMessage?.message ||
-        message
-    );
+    if (message.ephemeralMessage?.message) {
+        return unwrapMessage(
+            message.ephemeralMessage.message
+        );
+    }
+
+    if (message.viewOnceMessage?.message) {
+        return unwrapMessage(
+            message.viewOnceMessage.message
+        );
+    }
+
+    if (message.viewOnceMessageV2?.message) {
+        return unwrapMessage(
+            message.viewOnceMessageV2.message
+        );
+    }
+
+    if (message.viewOnceMessageV2Extension?.message) {
+        return unwrapMessage(
+            message.viewOnceMessageV2Extension.message
+        );
+    }
+
+    if (message.documentWithCaptionMessage?.message) {
+        return unwrapMessage(
+            message.documentWithCaptionMessage.message
+        );
+    }
+
+    if (message.editedMessage?.message) {
+        return unwrapMessage(
+            message.editedMessage.message
+        );
+    }
+
+    return message;
 }
 
+
+function getMessageContent(message) {
+    return unwrapMessage(message);
+}
+
+
 function getMessageType(message) {
-    if (!message) {
-        return null;
+    const content =
+        unwrapMessage(message);
+
+    if (!content) {
+        return "unknown";
     }
 
-    if (message.conversation) {
+    if (content.conversation) {
         return "text";
     }
 
-    if (message.extendedTextMessage) {
+    if (content.extendedTextMessage) {
         return "extendedText";
     }
 
-    if (message.imageMessage) {
+    if (content.imageMessage) {
         return "image";
     }
 
-    if (message.videoMessage) {
+    if (content.videoMessage) {
         return "video";
     }
 
-    if (message.audioMessage) {
+    if (content.audioMessage) {
         return "audio";
     }
 
-    if (message.documentMessage) {
+    if (content.documentMessage) {
         return "document";
     }
 
-    if (message.stickerMessage) {
+    if (content.stickerMessage) {
         return "sticker";
     }
 
-    if (message.contactMessage) {
+    if (content.contactMessage) {
         return "contact";
     }
 
-    if (message.contactsArrayMessage) {
+    if (content.contactsArrayMessage) {
         return "contacts";
     }
 
-    if (message.locationMessage) {
+    if (content.locationMessage) {
         return "location";
     }
 
-    if (message.liveLocationMessage) {
+    if (content.liveLocationMessage) {
         return "liveLocation";
     }
 
-    if (message.reactionMessage) {
+    if (content.reactionMessage) {
         return "reaction";
     }
 
-    if (message.pollCreationMessage) {
+    if (content.pollCreationMessage) {
         return "poll";
+    }
+
+    if (content.buttonsResponseMessage) {
+        return "buttonResponse";
+    }
+
+    if (content.listResponseMessage) {
+        return "listResponse";
+    }
+
+    if (content.templateButtonReplyMessage) {
+        return "templateButtonResponse";
+    }
+
+    if (content.interactiveResponseMessage) {
+        return "interactiveResponse";
     }
 
     return "unknown";
 }
 
+
 function extractText(message) {
-    if (!message) {
+    const content =
+        unwrapMessage(message);
+
+    if (!content) {
         return "";
     }
 
-    return (
-        message.conversation ||
-        message.extendedTextMessage?.text ||
-        message.imageMessage?.caption ||
-        message.videoMessage?.caption ||
-        message.documentMessage?.caption ||
-        message.buttonsResponseMessage?.selectedDisplayText ||
-        message.listResponseMessage?.title ||
-        message.templateButtonReplyMessage?.selectedDisplayText ||
-        ""
-    ).trim();
+    const text =
+        content.conversation ||
+        content.extendedTextMessage?.text ||
+        content.imageMessage?.caption ||
+        content.videoMessage?.caption ||
+        content.documentMessage?.caption ||
+        content.buttonsResponseMessage?.selectedDisplayText ||
+        content.buttonsResponseMessage?.selectedButtonId ||
+        content.listResponseMessage?.title ||
+        content.listResponseMessage?.singleSelectReply?.selectedRowId ||
+        content.templateButtonReplyMessage?.selectedDisplayText ||
+        content.templateButtonReplyMessage?.selectedId ||
+        content.interactiveResponseMessage?.body?.text ||
+        content.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ||
+        "";
+
+    return String(text).trim();
 }
 
+
 function getContextInfo(message) {
-    if (!message) {
+    const content =
+        unwrapMessage(message);
+
+    if (!content) {
         return null;
     }
 
     return (
-        message.extendedTextMessage?.contextInfo ||
-        message.imageMessage?.contextInfo ||
-        message.videoMessage?.contextInfo ||
-        message.documentMessage?.contextInfo ||
-        message.stickerMessage?.contextInfo ||
+        content.extendedTextMessage?.contextInfo ||
+        content.imageMessage?.contextInfo ||
+        content.videoMessage?.contextInfo ||
+        content.audioMessage?.contextInfo ||
+        content.documentMessage?.contextInfo ||
+        content.stickerMessage?.contextInfo ||
+        content.buttonsResponseMessage?.contextInfo ||
+        content.listResponseMessage?.contextInfo ||
+        content.templateButtonReplyMessage?.contextInfo ||
+        content.interactiveResponseMessage?.contextInfo ||
         null
     );
 }
+
 
 function getQuotedMessage(message) {
     const context =
@@ -129,30 +205,131 @@ function getQuotedMessage(message) {
     }
 
     return {
-        message: context.quotedMessage,
-        stanzaId: context.stanzaId || null,
-        participant: context.participant || null,
-        remoteJid: context.remoteJid || null
+        message:
+            context.quotedMessage,
+
+        stanzaId:
+            context.stanzaId || null,
+
+        participant:
+            context.participant || null,
+
+        remoteJid:
+            context.remoteJid || null
     };
 }
+
 
 function getMentions(message) {
     const context =
         getContextInfo(message);
 
-    return context?.mentionedJid || [];
+    return (
+        context?.mentionedJid || []
+    );
 }
 
+
 function getMimetype(message) {
+    const content =
+        unwrapMessage(message);
+
     return (
-        message?.imageMessage?.mimetype ||
-        message?.videoMessage?.mimetype ||
-        message?.audioMessage?.mimetype ||
-        message?.documentMessage?.mimetype ||
-        message?.stickerMessage?.mimetype ||
+        content?.imageMessage?.mimetype ||
+        content?.videoMessage?.mimetype ||
+        content?.audioMessage?.mimetype ||
+        content?.documentMessage?.mimetype ||
+        content?.stickerMessage?.mimetype ||
         null
     );
 }
+
+
+function getConnectedJid(sock) {
+    return normalizeJid(
+        sock?.user?.id
+    );
+}
+
+
+function getConnectedNumber(sock) {
+    const connectedJid =
+        getConnectedJid(sock);
+
+    if (!connectedJid) {
+        return null;
+    }
+
+    return getNumberFromJid(
+        connectedJid
+    );
+}
+
+
+function resolveSender(sock, key) {
+    const rawSender =
+        normalizeJid(
+            key?.participant ||
+            key?.remoteJid
+        );
+
+    if (!rawSender) {
+        return {
+            jid: null,
+            number: null,
+            resolved: null
+        };
+    }
+
+    /*
+     * Messages sent by the connected account
+     * can arrive using the account's @lid JID.
+     *
+     * For fromMe messages, we can safely resolve
+     * the sender to the connected account.
+     */
+    if (key?.fromMe) {
+        const connectedJid =
+            getConnectedJid(sock);
+
+        const connectedNumber =
+            getConnectedNumber(sock);
+
+        return {
+            jid:
+                rawSender,
+
+            number:
+                connectedNumber ||
+                getNumberFromJid(
+                    rawSender
+                ),
+
+            resolved:
+                connectedNumber ||
+                getNumberFromJid(
+                    rawSender
+                )
+        };
+    }
+
+    const number =
+        getNumberFromJid(
+            rawSender
+        );
+
+    return {
+        jid:
+            rawSender,
+
+        number:
+            number,
+
+        resolved:
+            number
+    };
+}
+
 
 class VoltageMessage {
     constructor(sock, raw) {
@@ -167,7 +344,8 @@ class VoltageMessage {
                 raw?.message
             );
 
-        this.key = key;
+        this.key =
+            key;
 
         this.id =
             key.id || null;
@@ -177,19 +355,20 @@ class VoltageMessage {
                 key.remoteJid
             );
 
-        this.sender =
-            normalizeJid(
-                key.participant ||
-                key.remoteJid
+        const sender =
+            resolveSender(
+                sock,
+                key
             );
+
+        this.sender =
+            sender.jid;
 
         this.senderNumber =
-            getNumberFromJid(
-                this.sender
-            );
+            sender.number;
 
         this.senderResolved =
-            this.senderNumber;
+            sender.resolved;
 
         this.pushName =
             raw?.pushName || null;
@@ -203,6 +382,9 @@ class VoltageMessage {
         this.type =
             getMessageType(content);
 
+        this.mtype =
+            this.type;
+
         this.mimetype =
             getMimetype(content);
 
@@ -212,7 +394,9 @@ class VoltageMessage {
             );
 
         this.isFromMe =
-            Boolean(key.fromMe);
+            Boolean(
+                key.fromMe
+            );
 
         this.mentions =
             getMentions(content);
@@ -220,6 +404,11 @@ class VoltageMessage {
         this.quoted =
             getQuotedMessage(content);
 
+        /*
+         * Pass the VoltageMessage instance so
+         * permissions.js can inspect the connected
+         * WhatsApp account.
+         */
         this.isOwner =
             isOwner(
                 this.sender,
@@ -231,6 +420,51 @@ class VoltageMessage {
                 this.sender
             );
 
+        this.isAdmin =
+            false;
+
+        this.isBotAdmin =
+            false;
+
+        this.isGroupOwner =
+            false;
+
+        this.isMedia =
+            [
+                "image",
+                "video",
+                "audio",
+                "document",
+                "sticker"
+            ].includes(
+                this.type
+            );
+
+        this.mediaType =
+            this.isMedia
+                ? this.type
+                : null;
+
+        this.isButtonResponse =
+            [
+                "buttonResponse",
+                "listResponse",
+                "templateButtonResponse",
+                "interactiveResponse"
+            ].includes(
+                this.type
+            );
+
+        this.buttonId =
+            content?.buttonsResponseMessage
+                ?.selectedButtonId ||
+            content?.listResponseMessage
+                ?.singleSelectReply
+                ?.selectedRowId ||
+            content?.templateButtonReplyMessage
+                ?.selectedId ||
+            null;
+
         this.groupMetadata =
             null;
 
@@ -240,6 +474,7 @@ class VoltageMessage {
         this.command =
             null;
     }
+
 
     async loadGroupMetadata() {
         if (!this.isGroup) {
@@ -253,10 +488,70 @@ class VoltageMessage {
                 );
 
             return this.groupMetadata;
-        } catch {
+        } catch (error) {
+            console.error(
+                "[Voltage] Failed to load group metadata:",
+                error.message
+            );
+
             return null;
         }
     }
+
+
+    async loadPermissions() {
+        if (!this.isGroup) {
+            return;
+        }
+
+        const participants =
+            this.groupMetadata
+                ?.participants || [];
+
+        const normalize =
+            jid =>
+                normalizeJid(jid);
+
+        const senderParticipant =
+            participants.find(
+                participant =>
+                    normalize(
+                        participant?.id
+                    ) === normalize(
+                        this.sender
+                    )
+            );
+
+        const botJid =
+            normalizeJid(
+                this.sock?.user?.id
+            );
+
+        const botParticipant =
+            participants.find(
+                participant =>
+                    normalize(
+                        participant?.id
+                    ) === botJid
+            );
+
+        this.isAdmin =
+            Boolean(
+                senderParticipant?.admin === "admin" ||
+                senderParticipant?.admin === "superadmin" ||
+                this.isOwner
+            );
+
+        this.isBotAdmin =
+            Boolean(
+                botParticipant?.admin === "admin" ||
+                botParticipant?.admin === "superadmin"
+            );
+
+        this.isGroupOwner =
+            senderParticipant?.admin === "superadmin";
+    }
+
 
     async reply(
         content,
@@ -265,14 +560,17 @@ class VoltageMessage {
         return this.sock.sendMessage(
             this.from,
             {
-                text: String(content)
+                text:
+                    String(content)
             },
             {
-                quoted: this.raw,
+                quoted:
+                    this.raw,
                 ...options
             }
         );
     }
+
 
     async send(
         content,
@@ -284,10 +582,12 @@ class VoltageMessage {
             typeof content === "string"
         ) {
             message = {
-                text: content
+                text:
+                    content
             };
         } else {
-            message = content;
+            message =
+                content;
         }
 
         return this.sock.sendMessage(
@@ -296,6 +596,7 @@ class VoltageMessage {
             options
         );
     }
+
 
     async edit(
         messageKey,
@@ -311,24 +612,32 @@ class VoltageMessage {
         return this.sock.sendMessage(
             this.from,
             {
-                text: String(content),
-                edit: messageKey
+                text:
+                    String(content),
+
+                edit:
+                    messageKey
             },
             options
         );
     }
+
 
     async react(emoji) {
         return this.sock.sendMessage(
             this.from,
             {
                 react: {
-                    text: emoji,
-                    key: this.key
+                    text:
+                        emoji,
+
+                    key:
+                        this.key
                 }
             }
         );
     }
+
 
     async forward(
         jid = this.from
@@ -336,10 +645,12 @@ class VoltageMessage {
         return this.sock.sendMessage(
             jid,
             {
-                forward: this.raw
+                forward:
+                    this.raw
             }
         );
     }
+
 
     async download() {
         if (!this.body) {
@@ -354,31 +665,41 @@ class VoltageMessage {
         if (this.body.imageMessage) {
             media =
                 this.body.imageMessage;
-            type = "image";
+
+            type =
+                "image";
         } else if (
             this.body.videoMessage
         ) {
             media =
                 this.body.videoMessage;
-            type = "video";
+
+            type =
+                "video";
         } else if (
             this.body.audioMessage
         ) {
             media =
                 this.body.audioMessage;
-            type = "audio";
+
+            type =
+                "audio";
         } else if (
             this.body.documentMessage
         ) {
             media =
                 this.body.documentMessage;
-            type = "document";
+
+            type =
+                "document";
         } else if (
             this.body.stickerMessage
         ) {
             media =
                 this.body.stickerMessage;
-            type = "sticker";
+
+            type =
+                "sticker";
         }
 
         if (!media) {
@@ -407,6 +728,7 @@ class VoltageMessage {
     }
 }
 
+
 async function serializeMessage(
     sock,
     raw
@@ -426,10 +748,12 @@ async function serializeMessage(
 
     if (message.isGroup) {
         await message.loadGroupMetadata();
+        await message.loadPermissions();
     }
 
     return message;
 }
+
 
 module.exports = {
     VoltageMessage,
