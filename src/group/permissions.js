@@ -29,48 +29,110 @@ function getConfiguredOwner() {
     );
 }
 
-function getConnectedNumber(message) {
-    const jid =
-        message?.sock?.user?.id;
+function getConnectedJids(message) {
+    const user =
+        message?.sock?.user;
 
-    if (!jid) {
-        return null;
+    if (!user) {
+        return [];
     }
 
-    return normalizeNumber(
-        getNumberFromJid(jid)
-    );
+    return [
+        user.id,
+        user.lid
+    ]
+        .filter(Boolean)
+        .map(
+            jid =>
+                normalizeJid(jid)
+        )
+        .filter(Boolean);
+}
+
+function getConnectedNumber(message) {
+    const jids =
+        getConnectedJids(
+            message
+        );
+
+    for (
+        const jid
+        of jids
+    ) {
+        const number =
+            normalizeNumber(
+                getNumberFromJid(
+                    jid
+                )
+            );
+
+        if (number) {
+            return number;
+        }
+    }
+
+    return null;
 }
 
 function isOwner(
     jid,
     message = null
 ) {
-    const senderNumber =
-        normalizeNumber(
-            getNumberFromJid(jid)
-        );
+    if (
+        message?.isFromMe
+    ) {
+        return true;
+    }
 
-    if (!senderNumber) {
+    const senderJid =
+        normalizeJid(jid);
+
+    if (!senderJid) {
         return false;
     }
+
+    const senderNumber =
+        normalizeNumber(
+            getNumberFromJid(
+                senderJid
+            )
+        );
 
     const configuredOwner =
         getConfiguredOwner();
 
     if (
         configuredOwner &&
-        senderNumber === configuredOwner
+        senderNumber &&
+        senderNumber ===
+            configuredOwner
+    ) {
+        return true;
+    }
+
+    const connectedJids =
+        getConnectedJids(
+            message
+        );
+
+    if (
+        connectedJids.includes(
+            senderJid
+        )
     ) {
         return true;
     }
 
     const connectedNumber =
-        getConnectedNumber(message);
+        getConnectedNumber(
+            message
+        );
 
     if (
         connectedNumber &&
-        senderNumber === connectedNumber
+        senderNumber &&
+        senderNumber ===
+            connectedNumber
     ) {
         return true;
     }
@@ -96,7 +158,9 @@ function isDev(jid) {
             .split(",")
             .map(
                 number =>
-                    normalizeNumber(number)
+                    normalizeNumber(
+                        number
+                    )
             )
             .filter(Boolean);
 
@@ -125,6 +189,68 @@ function getParticipant(
         ) || null;
 }
 
+function findBotParticipant(
+    message
+) {
+    const participants =
+        getParticipants(
+            message
+        );
+
+    const connectedJids =
+        getConnectedJids(
+            message
+        );
+
+    for (
+        const participant
+        of participants
+    ) {
+        const participantJid =
+            normalizeJid(
+                participant?.id
+            );
+
+        if (
+            participantJid &&
+            connectedJids.includes(
+                participantJid
+            )
+        ) {
+            return participant;
+        }
+    }
+
+    const connectedNumber =
+        getConnectedNumber(
+            message
+        );
+
+    if (connectedNumber) {
+        for (
+            const participant
+            of participants
+        ) {
+            const number =
+                normalizeNumber(
+                    getNumberFromJid(
+                        participant?.id
+                    )
+                );
+
+            if (
+                number &&
+                number ===
+                    connectedNumber
+            ) {
+                return participant;
+            }
+        }
+    }
+
+    return null;
+}
+
 function isAdminParticipant(
     participant
 ) {
@@ -133,12 +259,16 @@ function isAdminParticipant(
     }
 
     return (
-        participant.admin === "admin" ||
-        participant.admin === "superadmin"
+        participant.admin ===
+            "admin" ||
+        participant.admin ===
+            "superadmin"
     );
 }
 
-function isRequesterAdmin(message) {
+function isRequesterAdmin(
+    message
+) {
     if (message?.isOwner) {
         return true;
     }
@@ -151,25 +281,10 @@ function isRequesterAdmin(message) {
     );
 }
 
-function getBotJid(message) {
-    return (
-        message?.sock?.user?.id ||
-        null
-    );
-}
-
 function isBotAdmin(message) {
-    const botJid =
-        getBotJid(message);
-
-    if (!botJid) {
-        return false;
-    }
-
     return isAdminParticipant(
-        getParticipant(
-            message,
-            botJid
+        findBotParticipant(
+            message
         )
     );
 }
@@ -198,7 +313,9 @@ function isTargetInGroup(
     );
 }
 
-function canManageGroup(message) {
+function canManageGroup(
+    message
+) {
     if (!message?.isGroup) {
         return {
             allowed: false,
@@ -230,6 +347,8 @@ module.exports = {
     getParticipants,
     getParticipant,
     normalizeNumber,
+    getConnectedJids,
+    getConnectedNumber,
     isOwner,
     isDev,
     isAdminParticipant,
