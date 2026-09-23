@@ -7,12 +7,13 @@ const {
 } = require("./triggers");
 
 const {
-    dispatchCommand
-} = require("../plugins/dispatcher");
+    resolveCommand
+} = require("../utils/commandResolver");
 
 const {
-    generateResponse
-} = require("../ai/ai");
+    dispatchCommand,
+    commandRegistry
+} = require("../commands/dispatcher");
 
 const FOOTER =
     "Powered by Thereal_VoltageLord";
@@ -48,7 +49,8 @@ async function dispatchMessage(sock, raw) {
     }
 
     console.log(
-        `[Voltage] Message: type=${message.type} ` +
+        `[Voltage] Message: ` +
+        `type=${message.type} ` +
         `text="${message.text}" ` +
         `from=${message.sender} ` +
         `number=${message.senderNumber} ` +
@@ -66,36 +68,41 @@ async function dispatchMessage(sock, raw) {
         return null;
     }
 
+    /*
+     * ==========================
+     * PREFIX COMMAND
+     * ==========================
+     *
+     * .ping
+     * .menu
+     * .docanalyze
+     */
+
     const trigger =
         shouldRespond(message);
 
     console.log(
-        `[Voltage] Trigger: respond=${trigger.respond} ` +
+        `[Voltage] Trigger: ` +
+        `respond=${trigger.respond} ` +
         `reason=${trigger.reason}`
     );
 
-    if (!trigger.respond) {
-        return null;
-    }
-
-    message.trigger =
-        trigger;
-
-    message.command =
-        trigger.command || null;
-
     /*
-     * ==========================
-     * NORMAL COMMANDS
-     * ==========================
+     * Normal prefixed command.
      */
-
     if (
         trigger.reason === "command" &&
-        message.command
+        trigger.command
     ) {
+        message.trigger =
+            trigger;
+
+        message.command =
+            trigger.command;
+
         console.log(
-            `[Voltage] Command detected: .${message.command.name}`
+            `[Voltage] Prefix command detected: ` +
+            `${message.command.name}`
         );
 
         try {
@@ -112,6 +119,10 @@ async function dispatchMessage(sock, raw) {
                 return message;
             }
 
+            console.log(
+                "[Voltage] Command was not handled."
+            );
+
         } catch (error) {
             console.error(
                 "[Voltage] Command error:",
@@ -127,150 +138,232 @@ async function dispatchMessage(sock, raw) {
                 );
             } catch (replyError) {
                 console.error(
-                    "[Voltage] Command error reply failed:",
+                    "[Voltage] Failed to send command error:",
                     replyError
                 );
             }
 
             return message;
         }
+
+        return message;
     }
 
     /*
      * ==========================
-     * VOLTAGE AI
+     * NATURAL COMMAND RESOLUTION
+     * ==========================
+     *
+     * Voltage ping
+     * Voltage analyze this document
+     * Voltage analyse
+     * what does this document contain
+     * give analysis
+     */
+
+    const text =
+        String(
+            message.text || ""
+        ).trim();
+
+    if (!text) {
+        console.log(
+            "[Voltage] Message has no usable text."
+        );
+
+        return null;
+    }
+
+    /*
+     * Only attempt natural command
+     * resolution when the message
+     * actually addresses Voltage
+     * or is explicitly configured
+     * as a command-like request.
+     */
+
+    const containsVoltage =
+        /\bvoltage\b/i.test(text);
+
+    if (
+        !containsVoltage &&
+        message.isGroup
+    ) {
+        console.log(
+            "[Voltage] Group message does not address Voltage."
+        );
+
+        return null;
+    }
+
+    /*
+     * Remove the Voltage trigger
+     * before resolving the command.
+     *
+     * Voltage analyze this document
+     * becomes:
+     * analyze this document
+     */
+
+    const commandQuery =
+        text.replace(
+            /^voltage\b[\s,:-]*/i,
+            ""
+        ).trim();
+
+    if (!commandQuery) {
+        console.log(
+            "[Voltage] Voltage was called without a command."
+        );
+
+        return message;
+    }
+
+    console.log(
+        `[Voltage] Resolving natural command: "${commandQuery}"`
+    );
+
+    let resolved;
+
+    try {
+        resolved =
+            resolveCommand(
+                commandQuery,
+                commandRegistry
+            );
+    } catch (error) {
+        console.error(
+            "[Voltage] Command resolver error:",
+            error
+        );
+
+        return message;
+    }
+
+    if (!resolved) {
+        console.log(
+            "[Voltage] Command resolver returned nothing."
+        );
+
+        return message;
+    }
+
+    console.log(
+        `[Voltage] Resolver result: ` +
+        `type=${resolved.type} ` +
+        `name=${resolved.name || "none"} ` +
+        `score=${resolved.score}`
+    );
+
+    /*
+     * ==========================
+     * STRONG COMMAND MATCH
      * ==========================
      */
 
     if (
-        trigger.reason === "voltage" ||
-        trigger.reason === "mention" ||
-        trigger.reason === "reply"
+        resolved.type === "match" &&
+        resolved.command
     ) {
-        console.log(
-            "[Voltage] AI trigger accepted."
-        );
-
-        let aiMessage =
-            message.text;
-
-        /*
-         * Remove "Voltage" from the
-         * beginning before sending
-         * the actual request to the brain.
-         *
-         * Voltage hi
-         * becomes:
-         * hi
-         */
-
-        if (
-            trigger.reason === "voltage"
-        ) {
-            aiMessage =
-                trigger.command?.rawArgs || "";
-        }
-
-        /*
-         * If the user only says
-         * "Voltage", still let the
-         * personality handle it.
-         */
-
-        if (!aiMessage.trim()) {
-            aiMessage =
-                "The user called your name. Respond naturally.";
-        }
-
-        const aiInput = {
-            ...message,
-            text: aiMessage
+        message.trigger = {
+            respond: true,
+            reason: "natural_command",
+            command: resolved
         };
 
+        message.command =
+            resolved.command;
+
+        /*
+         * Arguments extracted by
+         * commandResolver.js.
+         */
+
+        message.args =
+            resolved.args || "";
+
+        message.commandArgs =
+            resolved.args || "";
+
         console.log(
-            `[Voltage] Sending to brain: "${aiMessage}"`
+            `[Voltage] Natural command matched: ` +
+            `${resolved.name} ` +
+            `score=${resolved.score} ` +
+            `args="${resolved.args || ""}"`
         );
 
         try {
-            const result =
-                await generateResponse(
-                    aiInput
+            const handled =
+                await dispatchCommand(
+                    message
                 );
 
             console.log(
-                "[Voltage] Brain result:",
-                {
-                    success:
-                        result?.success,
-
-                    provider:
-                        result?.provider,
-
-                    model:
-                        result?.model,
-
-                    type:
-                        result?.type,
-
-                    error:
-                        result?.error
-                }
+                `[Voltage] Natural command handled=${Boolean(handled)}`
             );
 
-            if (
-                !result?.success ||
-                !result?.text
-            ) {
-                console.error(
-                    "[Voltage] Brain returned no usable response."
-                );
-
-                await message.reply(
-                    `My brain just failed to respond. Try that again.\n\n${FOOTER}`
-                );
-
+            if (handled) {
                 return message;
             }
 
-            const response =
-                String(
-                    result.text
-                ).trim();
-
             console.log(
-                `[Voltage] Brain response: "${response}"`
+                "[Voltage] Natural command was not handled."
             );
-
-            await message.reply(
-                `${response}\n\n${FOOTER}`
-            );
-
-            console.log(
-                "[Voltage] AI response sent."
-            );
-
-            return message;
 
         } catch (error) {
             console.error(
-                "[Voltage] AI error:",
+                "[Voltage] Natural command error:",
                 error
             );
 
             try {
                 await message.reply(
-                    `My brain just failed to respond. Try that again.\n\n${FOOTER}`
+                    `Command error: ${
+                        error.message ||
+                        "Unable to execute command."
+                    }\n\n${FOOTER}`
                 );
             } catch (replyError) {
                 console.error(
-                    "[Voltage] Failed to send AI error:",
+                    "[Voltage] Failed to send command error:",
                     replyError
                 );
             }
-
-            return message;
         }
+
+        return message;
     }
+
+    /*
+     * ==========================
+     * POSSIBLE MATCH
+     * ==========================
+     *
+     * Don't execute uncertain
+     * commands automatically.
+     */
+
+    if (
+        resolved.type === "possible"
+    ) {
+        console.log(
+            `[Voltage] Possible command match: ` +
+            `${resolved.name} ` +
+            `score=${resolved.score}`
+        );
+
+        return message;
+    }
+
+    /*
+     * ==========================
+     * NO COMMAND
+     * ==========================
+     */
+
+    console.log(
+        `[Voltage] No command matched: "${commandQuery}"`
+    );
 
     return message;
 }
