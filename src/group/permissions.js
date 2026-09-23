@@ -1,7 +1,7 @@
 const {
     getNumberFromJid,
     normalizeJid
-} = require("./jid");
+} = require("../message/jid");
 
 function getParticipants(message) {
     return (
@@ -29,9 +29,7 @@ function getConfiguredOwner() {
     );
 }
 
-function getConnectedNumber(
-    message
-) {
+function getConnectedNumber(message) {
     const jid =
         message?.sock?.user?.id;
 
@@ -80,9 +78,7 @@ function isOwner(
     return false;
 }
 
-function isDev(
-    jid
-) {
+function isDev(jid) {
     const senderNumber =
         normalizeNumber(
             getNumberFromJid(jid)
@@ -142,9 +138,7 @@ function isAdminParticipant(
     );
 }
 
-function isRequesterAdmin(
-    message
-) {
+function isRequesterAdmin(message) {
     if (message?.isOwner) {
         return true;
     }
@@ -204,9 +198,7 @@ function isTargetInGroup(
     );
 }
 
-function canManageGroup(
-    message
-) {
+function canManageGroup(message) {
     if (!message?.isGroup) {
         return {
             allowed: false,
