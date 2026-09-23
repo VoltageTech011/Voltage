@@ -1,3 +1,8 @@
+const {
+    getNumberFromJid,
+    normalizeJid
+} = require("./jid");
+
 function getParticipants(message) {
     return (
         message?.groupMetadata?.participants ||
@@ -5,14 +10,103 @@ function getParticipants(message) {
     );
 }
 
-function normalizeJid(jid) {
+function normalizeNumber(value) {
+    if (!value) {
+        return null;
+    }
+
+    return String(value)
+        .replace(/\D/g, "")
+        .replace(/^0+/, "")
+        .trim();
+}
+
+function getConfiguredOwner() {
+    return normalizeNumber(
+        process.env.OWNER_NUMBER ||
+        process.env.OWNER_PHONE ||
+        ""
+    );
+}
+
+function getConnectedNumber(
+    message
+) {
+    const jid =
+        message?.sock?.user?.id;
+
     if (!jid) {
         return null;
     }
 
-    return String(jid)
-        .trim()
-        .toLowerCase();
+    return normalizeNumber(
+        getNumberFromJid(jid)
+    );
+}
+
+function isOwner(
+    jid,
+    message = null
+) {
+    const senderNumber =
+        normalizeNumber(
+            getNumberFromJid(jid)
+        );
+
+    if (!senderNumber) {
+        return false;
+    }
+
+    const configuredOwner =
+        getConfiguredOwner();
+
+    if (
+        configuredOwner &&
+        senderNumber === configuredOwner
+    ) {
+        return true;
+    }
+
+    const connectedNumber =
+        getConnectedNumber(message);
+
+    if (
+        connectedNumber &&
+        senderNumber === connectedNumber
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+function isDev(
+    jid
+) {
+    const senderNumber =
+        normalizeNumber(
+            getNumberFromJid(jid)
+        );
+
+    if (!senderNumber) {
+        return false;
+    }
+
+    const developers =
+        String(
+            process.env.DEV_NUMBERS ||
+            ""
+        )
+            .split(",")
+            .map(
+                number =>
+                    normalizeNumber(number)
+            )
+            .filter(Boolean);
+
+    return developers.includes(
+        senderNumber
+    );
 }
 
 function getParticipant(
@@ -143,6 +237,9 @@ function canManageGroup(
 module.exports = {
     getParticipants,
     getParticipant,
+    normalizeNumber,
+    isOwner,
+    isDev,
     isAdminParticipant,
     isRequesterAdmin,
     isBotAdmin,
