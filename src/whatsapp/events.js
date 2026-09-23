@@ -1,62 +1,103 @@
 const {
-    dispatchMessage
+dispatchMessage
 } = require("../message/dispatcher");
 
 async function registerWhatsAppEvents(sock) {
-    if (!sock) {
-        throw new Error(
-            "Cannot register events without a WhatsApp socket."
+if (!sock || !sock.ev) {
+throw new Error(
+"Cannot register WhatsApp events without a valid socket."
+);
+}
+
+console.log(
+    "[Voltage] Registering WhatsApp message events..."
+);
+
+sock.ev.on(
+    "messages.upsert",
+    async (event) => {
+        console.log(
+            "[Voltage] messages.upsert event received."
         );
-    }
 
-    sock.ev.on(
-        "messages.upsert",
-        async (event) => {
-            try {
-                const messages =
-                    event?.messages || [];
+        try {
+            const messages =
+                Array.isArray(event?.messages)
+                    ? event.messages
+                    : [];
 
-                if (!messages.length) {
-                    return;
-                }
+            console.log(
+                `[Voltage] messages.upsert type: ${
+                    event?.type || "unknown"
+                } | messages: ${messages.length}`
+            );
 
-                console.log(
-                    `[Voltage] Received ${messages.length} WhatsApp message(s).`
-                );
-
-                for (const raw of messages) {
-                    try {
-                        if (!raw?.message) {
-                            continue;
-                        }
-
-                        console.log(
-                            `[Voltage] Processing message ${raw.key?.id || "unknown"}`
-                        );
-
-                        await dispatchMessage(
-                            sock,
-                            raw
-                        );
-                    } catch (error) {
-                        console.error(
-                            "[Voltage] Message processing error:",
-                            error
-                        );
-                    }
-                }
-            } catch (error) {
-                console.error(
-                    "[Voltage] messages.upsert error:",
-                    error
-                );
+            if (!messages.length) {
+                return;
             }
-        }
-    );
 
-    sock.ev.on(
-        "messages.update",
-        updates => {
+            for (const raw of messages) {
+                try {
+                    console.log(
+                        `[Voltage] Incoming message: ${
+                            raw?.key?.id ||
+                            "unknown"
+                        }`
+                    );
+
+                    console.log(
+                        `[Voltage] From: ${
+                            raw?.key?.remoteJid ||
+                            "unknown"
+                        } | FromMe: ${
+                            Boolean(
+                                raw?.key?.fromMe
+                            )
+                        }`
+                    );
+
+                    if (!raw?.message) {
+                        console.log(
+                            "[Voltage] Message has no message payload. Skipping."
+                        );
+
+                        continue;
+                    }
+
+                    console.log(
+                        "[Voltage] Dispatching message..."
+                    );
+
+                    await dispatchMessage(
+                        sock,
+                        raw
+                    );
+
+                    console.log(
+                        "[Voltage] Message dispatch completed."
+                    );
+                } catch (error) {
+                    console.error(
+                        "[Voltage] Message processing error:",
+                        error?.stack ||
+                        error
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(
+                "[Voltage] messages.upsert handler error:",
+                error?.stack ||
+                error
+            );
+        }
+    }
+);
+
+sock.ev.on(
+    "messages.update",
+    updates => {
+        try {
             if (!Array.isArray(updates)) {
                 return;
             }
@@ -69,35 +110,62 @@ async function registerWhatsAppEvents(sock) {
                     }`
                 );
             }
+        } catch (error) {
+            console.error(
+                "[Voltage] messages.update error:",
+                error?.stack ||
+                error
+            );
         }
-    );
+    }
+);
 
-    sock.ev.on(
-        "messages.delete",
-        update => {
+sock.ev.on(
+    "messages.delete",
+    update => {
+        try {
             console.log(
                 "[Voltage] Message deletion event."
             );
+        } catch (error) {
+            console.error(
+                "[Voltage] messages.delete error:",
+                error?.stack ||
+                error
+            );
         }
-    );
+    }
+);
 
-    sock.ev.on(
-        "group-participants.update",
-        update => {
+sock.ev.on(
+    "group-participants.update",
+    update => {
+        try {
             console.log(
                 `[Voltage] Group participant event: ${
                     update?.action ||
                     "unknown"
-                } ${update?.id || ""}`
+                } ${
+                    update?.id ||
+                    ""
+                }`
+            );
+        } catch (error) {
+            console.error(
+                "[Voltage] group-participants.update error:",
+                error?.stack ||
+                error
             );
         }
-    );
+    }
+);
 
-    console.log(
-        "[Voltage] WhatsApp message events registered."
-    );
+console.log(
+    "[Voltage] WhatsApp message events registered."
+);
+
 }
 
 module.exports = {
-    registerWhatsAppEvents
+registerWhatsAppEvents
 };
