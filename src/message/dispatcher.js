@@ -41,19 +41,17 @@ async function dispatchMessage(sock, raw) {
 
     if (!message) {
         console.log(
-            "[Voltage] Message serialization returned null."
+            "[Voltage] Serialization returned null."
         );
 
         return null;
     }
 
     console.log(
-        `[Voltage] Serialized message: ` +
-        `type=${message.type} ` +
+        `[Voltage] Message: type=${message.type} ` +
         `text="${message.text}" ` +
-        `sender=${message.sender} ` +
-        `senderNumber=${message.senderNumber} ` +
-        `owner=${message.isOwner} ` +
+        `from=${message.sender} ` +
+        `number=${message.senderNumber} ` +
         `fromMe=${message.isFromMe}`
     );
 
@@ -62,7 +60,7 @@ async function dispatchMessage(sock, raw) {
         !message.text
     ) {
         console.log(
-            "[Voltage] Ignoring unsupported/system message."
+            "[Voltage] Ignoring unsupported message."
         );
 
         return null;
@@ -72,8 +70,7 @@ async function dispatchMessage(sock, raw) {
         shouldRespond(message);
 
     console.log(
-        `[Voltage] Trigger result: ` +
-        `respond=${trigger.respond} ` +
+        `[Voltage] Trigger: respond=${trigger.respond} ` +
         `reason=${trigger.reason}`
     );
 
@@ -87,22 +84,16 @@ async function dispatchMessage(sock, raw) {
     message.command =
         trigger.command || null;
 
-    console.log(
-        `[Voltage] ${
-            message.isGroup
-                ? "GROUP"
-                : "DM"
-        } ${message.senderNumber || "unknown"} ` +
-        `→ ${trigger.reason}: ` +
-        `${message.text || `[${message.type}]`}`
-    );
-
     /*
-     * COMMAND PATH
-     *
-     * Commands must be handled before AI.
+     * ==========================
+     * NORMAL COMMANDS
+     * ==========================
      */
-    if (message.command) {
+
+    if (
+        trigger.reason === "command" &&
+        message.command
+    ) {
         console.log(
             `[Voltage] Command detected: .${message.command.name}`
         );
@@ -114,23 +105,16 @@ async function dispatchMessage(sock, raw) {
                 );
 
             console.log(
-                `[Voltage] Command result: handled=${Boolean(handled)}`
+                `[Voltage] Command handled=${Boolean(handled)}`
             );
 
             if (handled) {
-                console.log(
-                    "[Voltage] Command handled. AI will not run."
-                );
-
                 return message;
             }
 
-            console.log(
-                "[Voltage] Command was not handled."
-            );
         } catch (error) {
             console.error(
-                "[Voltage] Command dispatch error:",
+                "[Voltage] Command error:",
                 error
             );
 
@@ -143,7 +127,7 @@ async function dispatchMessage(sock, raw) {
                 );
             } catch (replyError) {
                 console.error(
-                    "[Voltage] Failed to send command error:",
+                    "[Voltage] Command error reply failed:",
                     replyError
                 );
             }
@@ -153,94 +137,142 @@ async function dispatchMessage(sock, raw) {
     }
 
     /*
-     * AI PATH
-     *
-     * Only normal triggered messages reach here.
+     * ==========================
+     * VOLTAGE AI
+     * ==========================
      */
-    console.log(
-        "[Voltage] AI trigger accepted."
-    );
 
-    console.log(
-        `[Voltage] Sending prompt to AI: "${message.text}"`
-    );
-
-    try {
-        const result =
-            await generateResponse(
-                message
-            );
-
+    if (
+        trigger.reason === "voltage" ||
+        trigger.reason === "mention" ||
+        trigger.reason === "reply"
+    ) {
         console.log(
-            "[Voltage] AI result:",
-            {
-                success:
-                    result?.success,
-                provider:
-                    result?.provider,
-                model:
-                    result?.model,
-                type:
-                    result?.type,
-                error:
-                    result?.error
-            }
+            "[Voltage] AI trigger accepted."
         );
+
+        let aiMessage =
+            message.text;
+
+        /*
+         * Remove "Voltage" from the
+         * beginning before sending
+         * the actual request to the brain.
+         *
+         * Voltage hi
+         * becomes:
+         * hi
+         */
 
         if (
-            !result ||
-            !result.success ||
-            !result.text
+            trigger.reason === "voltage"
         ) {
-            console.error(
-                "[Voltage] AI returned no usable response:",
-                result
-            );
-
-            await message.reply(
-                `My brain just failed to respond. Try that again.\n\n${FOOTER}`
-            );
-
-            return message;
+            aiMessage =
+                trigger.command?.rawArgs || "";
         }
 
-        const response =
-            String(
-                result.text
-            ).trim();
+        /*
+         * If the user only says
+         * "Voltage", still let the
+         * personality handle it.
+         */
+
+        if (!aiMessage.trim()) {
+            aiMessage =
+                "The user called your name. Respond naturally.";
+        }
+
+        const aiInput = {
+            ...message,
+            text: aiMessage
+        };
 
         console.log(
-            `[Voltage] AI response generated: "${response}"`
-        );
-
-        await message.reply(
-            `${response}\n\n${FOOTER}`
-        );
-
-        console.log(
-            "[Voltage] AI response sent."
-        );
-
-        return message;
-    } catch (error) {
-        console.error(
-            "[Voltage] AI dispatch error:",
-            error
+            `[Voltage] Sending to brain: "${aiMessage}"`
         );
 
         try {
-            await message.reply(
-                `My brain just failed to respond. Try that again.\n\n${FOOTER}`
-            );
-        } catch (replyError) {
-            console.error(
-                "[Voltage] Failed to send AI error response:",
-                replyError
-            );
-        }
+            const result =
+                await generateResponse(
+                    aiInput
+                );
 
-        return message;
+            console.log(
+                "[Voltage] Brain result:",
+                {
+                    success:
+                        result?.success,
+
+                    provider:
+                        result?.provider,
+
+                    model:
+                        result?.model,
+
+                    type:
+                        result?.type,
+
+                    error:
+                        result?.error
+                }
+            );
+
+            if (
+                !result?.success ||
+                !result?.text
+            ) {
+                console.error(
+                    "[Voltage] Brain returned no usable response."
+                );
+
+                await message.reply(
+                    `My brain just failed to respond. Try that again.\n\n${FOOTER}`
+                );
+
+                return message;
+            }
+
+            const response =
+                String(
+                    result.text
+                ).trim();
+
+            console.log(
+                `[Voltage] Brain response: "${response}"`
+            );
+
+            await message.reply(
+                `${response}\n\n${FOOTER}`
+            );
+
+            console.log(
+                "[Voltage] AI response sent."
+            );
+
+            return message;
+
+        } catch (error) {
+            console.error(
+                "[Voltage] AI error:",
+                error
+            );
+
+            try {
+                await message.reply(
+                    `My brain just failed to respond. Try that again.\n\n${FOOTER}`
+                );
+            } catch (replyError) {
+                console.error(
+                    "[Voltage] Failed to send AI error:",
+                    replyError
+                );
+            }
+
+            return message;
+        }
     }
+
+    return message;
 }
 
 module.exports = {
