@@ -1,39 +1,86 @@
 function normalizeJid(jid) {
-    if (!jid) return null;
+    if (!jid) {
+        return null;
+    }
 
     return String(jid)
         .trim()
+        .toLowerCase()
         .replace(/:\d+(?=@)/, "");
 }
 
 function getNumberFromJid(jid) {
-    if (!jid) return null;
+    if (!jid) {
+        return null;
+    }
 
-    const normalized = normalizeJid(jid);
+    const normalized =
+        normalizeJid(jid);
 
-    if (!normalized) return null;
+    if (!normalized) {
+        return null;
+    }
 
-    const match = normalized.match(/^(\d+)@/);
+    const match =
+        normalized.match(/^(\d+)@/);
 
-    return match ? match[1] : null;
+    return match
+        ? match[1]
+        : null;
 }
 
 function isGroupJid(jid) {
-    return typeof jid === "string" &&
-        jid.endsWith("@g.us");
+    return (
+        typeof jid === "string" &&
+        normalizeJid(jid)?.endsWith("@g.us")
+    );
 }
 
 function isUserJid(jid) {
-    return typeof jid === "string" &&
+    const normalized =
+        normalizeJid(jid);
+
+    return Boolean(
+        normalized &&
         (
-            jid.endsWith("@s.whatsapp.net") ||
-            jid.endsWith("@lid")
-        );
+            normalized.endsWith(
+                "@s.whatsapp.net"
+            ) ||
+            normalized.endsWith("@lid")
+        )
+    );
 }
 
 function isLidJid(jid) {
-    return typeof jid === "string" &&
-        jid.endsWith("@lid");
+    return (
+        normalizeJid(jid)?.endsWith("@lid") ||
+        false
+    );
+}
+
+function isPhoneJid(jid) {
+    return (
+        normalizeJid(jid)?.endsWith(
+            "@s.whatsapp.net"
+        ) || false
+    );
+}
+
+function toPhoneJid(number) {
+    if (!number) {
+        return null;
+    }
+
+    const normalized =
+        String(number)
+            .replace(/\D/g, "")
+            .replace(/^0+/, "");
+
+    if (!normalized) {
+        return null;
+    }
+
+    return `${normalized}@s.whatsapp.net`;
 }
 
 module.exports = {
@@ -41,5 +88,7 @@ module.exports = {
     getNumberFromJid,
     isGroupJid,
     isUserJid,
-    isLidJid
+    isLidJid,
+    isPhoneJid,
+    toPhoneJid
 };
