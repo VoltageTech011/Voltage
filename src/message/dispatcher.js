@@ -10,7 +10,14 @@ const {
     dispatchCommand
 } = require("../plugins/dispatcher");
 
-async function dispatchMessage(sock, raw) {
+const {
+    generateResponse
+} = require("../ai/ai");
+
+async function dispatchMessage(
+    sock,
+    raw
+) {
     const message =
         await serializeMessage(
             sock,
@@ -54,9 +61,37 @@ async function dispatchMessage(sock, raw) {
         if (handled) {
             return message;
         }
+
+        return message;
     }
 
-    return message;
+    try {
+        const response =
+            await generateResponse(
+                message
+            );
+
+        if (!response) {
+            return message;
+        }
+
+        await message.reply(
+            response
+        );
+
+        return message;
+    } catch (error) {
+        console.error(
+            "[Voltage] AI processing error:",
+            error
+        );
+
+        await message.reply(
+            "My brain just hit a wall. Try that again."
+        );
+
+        return message;
+    }
 }
 
 module.exports = {
