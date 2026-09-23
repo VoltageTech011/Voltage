@@ -13,188 +13,188 @@ const {
     isDev
 } = require("./permissions");
 
-
 function unwrapMessage(message) {
     if (!message) {
         return null;
     }
 
-    if (message.ephemeralMessage?.message) {
-        return unwrapMessage(
-            message.ephemeralMessage.message
-        );
+    let current = message;
+
+    for (let i = 0; i < 10; i++) {
+        if (!current) {
+            return null;
+        }
+
+        if (current.ephemeralMessage?.message) {
+            current =
+                current.ephemeralMessage.message;
+            continue;
+        }
+
+        if (current.viewOnceMessage?.message) {
+            current =
+                current.viewOnceMessage.message;
+            continue;
+        }
+
+        if (current.viewOnceMessageV2?.message) {
+            current =
+                current.viewOnceMessageV2.message;
+            continue;
+        }
+
+        if (
+            current.viewOnceMessageV2Extension?.message
+        ) {
+            current =
+                current.viewOnceMessageV2Extension.message;
+            continue;
+        }
+
+        if (
+            current.documentWithCaptionMessage?.message
+        ) {
+            current =
+                current.documentWithCaptionMessage.message;
+            continue;
+        }
+
+        if (
+            current.editedMessage?.message
+        ) {
+            current =
+                current.editedMessage.message;
+            continue;
+        }
+
+        break;
     }
 
-    if (message.viewOnceMessage?.message) {
-        return unwrapMessage(
-            message.viewOnceMessage.message
-        );
-    }
-
-    if (message.viewOnceMessageV2?.message) {
-        return unwrapMessage(
-            message.viewOnceMessageV2.message
-        );
-    }
-
-    if (message.viewOnceMessageV2Extension?.message) {
-        return unwrapMessage(
-            message.viewOnceMessageV2Extension.message
-        );
-    }
-
-    if (message.documentWithCaptionMessage?.message) {
-        return unwrapMessage(
-            message.documentWithCaptionMessage.message
-        );
-    }
-
-    if (message.editedMessage?.message) {
-        return unwrapMessage(
-            message.editedMessage.message
-        );
-    }
-
-    return message;
+    return current;
 }
-
 
 function getMessageContent(message) {
     return unwrapMessage(message);
 }
 
-
 function getMessageType(message) {
-    const content =
-        unwrapMessage(message);
-
-    if (!content) {
-        return "unknown";
+    if (!message) {
+        return null;
     }
 
-    if (content.conversation) {
+    if (message.conversation) {
         return "text";
     }
 
-    if (content.extendedTextMessage) {
+    if (message.extendedTextMessage) {
         return "extendedText";
     }
 
-    if (content.imageMessage) {
+    if (message.imageMessage) {
         return "image";
     }
 
-    if (content.videoMessage) {
+    if (message.videoMessage) {
         return "video";
     }
 
-    if (content.audioMessage) {
+    if (message.audioMessage) {
         return "audio";
     }
 
-    if (content.documentMessage) {
+    if (message.documentMessage) {
         return "document";
     }
 
-    if (content.stickerMessage) {
+    if (message.stickerMessage) {
         return "sticker";
     }
 
-    if (content.contactMessage) {
+    if (message.contactMessage) {
         return "contact";
     }
 
-    if (content.contactsArrayMessage) {
+    if (message.contactsArrayMessage) {
         return "contacts";
     }
 
-    if (content.locationMessage) {
+    if (message.locationMessage) {
         return "location";
     }
 
-    if (content.liveLocationMessage) {
+    if (message.liveLocationMessage) {
         return "liveLocation";
     }
 
-    if (content.reactionMessage) {
+    if (message.reactionMessage) {
         return "reaction";
     }
 
-    if (content.pollCreationMessage) {
+    if (message.pollCreationMessage) {
         return "poll";
     }
 
-    if (content.buttonsResponseMessage) {
-        return "buttonResponse";
+    if (message.pollUpdateMessage) {
+        return "pollUpdate";
     }
 
-    if (content.listResponseMessage) {
-        return "listResponse";
+    if (message.protocolMessage) {
+        return "protocol";
     }
 
-    if (content.templateButtonReplyMessage) {
-        return "templateButtonResponse";
+    if (message.senderKeyDistributionMessage) {
+        return "senderKeyDistribution";
     }
 
-    if (content.interactiveResponseMessage) {
-        return "interactiveResponse";
+    if (message.pinInChatMessage) {
+        return "pinInChat";
+    }
+
+    if (message.call) {
+        return "call";
     }
 
     return "unknown";
 }
 
-
 function extractText(message) {
-    const content =
-        unwrapMessage(message);
-
-    if (!content) {
+    if (!message) {
         return "";
     }
 
-    const text =
-        content.conversation ||
-        content.extendedTextMessage?.text ||
-        content.imageMessage?.caption ||
-        content.videoMessage?.caption ||
-        content.documentMessage?.caption ||
-        content.buttonsResponseMessage?.selectedDisplayText ||
-        content.buttonsResponseMessage?.selectedButtonId ||
-        content.listResponseMessage?.title ||
-        content.listResponseMessage?.singleSelectReply?.selectedRowId ||
-        content.templateButtonReplyMessage?.selectedDisplayText ||
-        content.templateButtonReplyMessage?.selectedId ||
-        content.interactiveResponseMessage?.body?.text ||
-        content.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ||
-        "";
-
-    return String(text).trim();
+    return (
+        message.conversation ||
+        message.extendedTextMessage?.text ||
+        message.imageMessage?.caption ||
+        message.videoMessage?.caption ||
+        message.documentMessage?.caption ||
+        message.buttonsResponseMessage?.selectedDisplayText ||
+        message.listResponseMessage?.title ||
+        message.templateButtonReplyMessage?.selectedDisplayText ||
+        message.interactiveResponseMessage?.body?.text ||
+        message.interactiveResponseMessage?.nativeFlowResponseMessage
+            ?.paramsJson ||
+        ""
+    ).trim();
 }
 
-
 function getContextInfo(message) {
-    const content =
-        unwrapMessage(message);
-
-    if (!content) {
+    if (!message) {
         return null;
     }
 
     return (
-        content.extendedTextMessage?.contextInfo ||
-        content.imageMessage?.contextInfo ||
-        content.videoMessage?.contextInfo ||
-        content.audioMessage?.contextInfo ||
-        content.documentMessage?.contextInfo ||
-        content.stickerMessage?.contextInfo ||
-        content.buttonsResponseMessage?.contextInfo ||
-        content.listResponseMessage?.contextInfo ||
-        content.templateButtonReplyMessage?.contextInfo ||
-        content.interactiveResponseMessage?.contextInfo ||
+        message.extendedTextMessage?.contextInfo ||
+        message.imageMessage?.contextInfo ||
+        message.videoMessage?.contextInfo ||
+        message.audioMessage?.contextInfo ||
+        message.documentMessage?.contextInfo ||
+        message.stickerMessage?.contextInfo ||
+        message.buttonsResponseMessage?.contextInfo ||
+        message.listResponseMessage?.contextInfo ||
         null
     );
 }
-
 
 function getQuotedMessage(message) {
     const context =
@@ -219,117 +219,23 @@ function getQuotedMessage(message) {
     };
 }
 
-
 function getMentions(message) {
     const context =
         getContextInfo(message);
 
-    return (
-        context?.mentionedJid || []
-    );
+    return context?.mentionedJid || [];
 }
 
-
 function getMimetype(message) {
-    const content =
-        unwrapMessage(message);
-
     return (
-        content?.imageMessage?.mimetype ||
-        content?.videoMessage?.mimetype ||
-        content?.audioMessage?.mimetype ||
-        content?.documentMessage?.mimetype ||
-        content?.stickerMessage?.mimetype ||
+        message?.imageMessage?.mimetype ||
+        message?.videoMessage?.mimetype ||
+        message?.audioMessage?.mimetype ||
+        message?.documentMessage?.mimetype ||
+        message?.stickerMessage?.mimetype ||
         null
     );
 }
-
-
-function getConnectedJid(sock) {
-    return normalizeJid(
-        sock?.user?.id
-    );
-}
-
-
-function getConnectedNumber(sock) {
-    const connectedJid =
-        getConnectedJid(sock);
-
-    if (!connectedJid) {
-        return null;
-    }
-
-    return getNumberFromJid(
-        connectedJid
-    );
-}
-
-
-function resolveSender(sock, key) {
-    const rawSender =
-        normalizeJid(
-            key?.participant ||
-            key?.remoteJid
-        );
-
-    if (!rawSender) {
-        return {
-            jid: null,
-            number: null,
-            resolved: null
-        };
-    }
-
-    /*
-     * Messages sent by the connected account
-     * can arrive using the account's @lid JID.
-     *
-     * For fromMe messages, we can safely resolve
-     * the sender to the connected account.
-     */
-    if (key?.fromMe) {
-        const connectedJid =
-            getConnectedJid(sock);
-
-        const connectedNumber =
-            getConnectedNumber(sock);
-
-        return {
-            jid:
-                rawSender,
-
-            number:
-                connectedNumber ||
-                getNumberFromJid(
-                    rawSender
-                ),
-
-            resolved:
-                connectedNumber ||
-                getNumberFromJid(
-                    rawSender
-                )
-        };
-    }
-
-    const number =
-        getNumberFromJid(
-            rawSender
-        );
-
-    return {
-        jid:
-            rawSender,
-
-        number:
-            number,
-
-        resolved:
-            number
-    };
-}
-
 
 class VoltageMessage {
     constructor(sock, raw) {
@@ -344,8 +250,7 @@ class VoltageMessage {
                 raw?.message
             );
 
-        this.key =
-            key;
+        this.key = key;
 
         this.id =
             key.id || null;
@@ -355,20 +260,19 @@ class VoltageMessage {
                 key.remoteJid
             );
 
-        const sender =
-            resolveSender(
-                sock,
-                key
+        this.sender =
+            normalizeJid(
+                key.participant ||
+                key.remoteJid
             );
 
-        this.sender =
-            sender.jid;
-
         this.senderNumber =
-            sender.number;
+            getNumberFromJid(
+                this.sender
+            );
 
         this.senderResolved =
-            sender.resolved;
+            this.senderNumber;
 
         this.pushName =
             raw?.pushName || null;
@@ -381,9 +285,6 @@ class VoltageMessage {
 
         this.type =
             getMessageType(content);
-
-        this.mtype =
-            this.type;
 
         this.mimetype =
             getMimetype(content);
@@ -404,11 +305,6 @@ class VoltageMessage {
         this.quoted =
             getQuotedMessage(content);
 
-        /*
-         * Pass the VoltageMessage instance so
-         * permissions.js can inspect the connected
-         * WhatsApp account.
-         */
         this.isOwner =
             isOwner(
                 this.sender,
@@ -420,51 +316,6 @@ class VoltageMessage {
                 this.sender
             );
 
-        this.isAdmin =
-            false;
-
-        this.isBotAdmin =
-            false;
-
-        this.isGroupOwner =
-            false;
-
-        this.isMedia =
-            [
-                "image",
-                "video",
-                "audio",
-                "document",
-                "sticker"
-            ].includes(
-                this.type
-            );
-
-        this.mediaType =
-            this.isMedia
-                ? this.type
-                : null;
-
-        this.isButtonResponse =
-            [
-                "buttonResponse",
-                "listResponse",
-                "templateButtonResponse",
-                "interactiveResponse"
-            ].includes(
-                this.type
-            );
-
-        this.buttonId =
-            content?.buttonsResponseMessage
-                ?.selectedButtonId ||
-            content?.listResponseMessage
-                ?.singleSelectReply
-                ?.selectedRowId ||
-            content?.templateButtonReplyMessage
-                ?.selectedId ||
-            null;
-
         this.groupMetadata =
             null;
 
@@ -473,8 +324,10 @@ class VoltageMessage {
 
         this.command =
             null;
-    }
 
+        this.mediaUrl =
+            null;
+    }
 
     async loadGroupMetadata() {
         if (!this.isGroup) {
@@ -490,68 +343,13 @@ class VoltageMessage {
             return this.groupMetadata;
         } catch (error) {
             console.error(
-                "[Voltage] Failed to load group metadata:",
+                "[Voltage] Group metadata error:",
                 error.message
             );
 
             return null;
         }
     }
-
-
-    async loadPermissions() {
-        if (!this.isGroup) {
-            return;
-        }
-
-        const participants =
-            this.groupMetadata
-                ?.participants || [];
-
-        const normalize =
-            jid =>
-                normalizeJid(jid);
-
-        const senderParticipant =
-            participants.find(
-                participant =>
-                    normalize(
-                        participant?.id
-                    ) === normalize(
-                        this.sender
-                    )
-            );
-
-        const botJid =
-            normalizeJid(
-                this.sock?.user?.id
-            );
-
-        const botParticipant =
-            participants.find(
-                participant =>
-                    normalize(
-                        participant?.id
-                    ) === botJid
-            );
-
-        this.isAdmin =
-            Boolean(
-                senderParticipant?.admin === "admin" ||
-                senderParticipant?.admin === "superadmin" ||
-                this.isOwner
-            );
-
-        this.isBotAdmin =
-            Boolean(
-                botParticipant?.admin === "admin" ||
-                botParticipant?.admin === "superadmin"
-            );
-
-        this.isGroupOwner =
-            senderParticipant?.admin === "superadmin";
-    }
-
 
     async reply(
         content,
@@ -560,35 +358,25 @@ class VoltageMessage {
         return this.sock.sendMessage(
             this.from,
             {
-                text:
-                    String(content)
+                text: String(content)
             },
             {
-                quoted:
-                    this.raw,
+                quoted: this.raw,
                 ...options
             }
         );
     }
 
-
     async send(
         content,
         options = {}
     ) {
-        let message;
-
-        if (
+        const message =
             typeof content === "string"
-        ) {
-            message = {
-                text:
-                    content
-            };
-        } else {
-            message =
-                content;
-        }
+                ? {
+                    text: content
+                }
+                : content;
 
         return this.sock.sendMessage(
             this.from,
@@ -596,7 +384,6 @@ class VoltageMessage {
             options
         );
     }
-
 
     async edit(
         messageKey,
@@ -612,32 +399,24 @@ class VoltageMessage {
         return this.sock.sendMessage(
             this.from,
             {
-                text:
-                    String(content),
-
-                edit:
-                    messageKey
+                text: String(content),
+                edit: messageKey
             },
             options
         );
     }
-
 
     async react(emoji) {
         return this.sock.sendMessage(
             this.from,
             {
                 react: {
-                    text:
-                        emoji,
-
-                    key:
-                        this.key
+                    text: emoji,
+                    key: this.key
                 }
             }
         );
     }
-
 
     async forward(
         jid = this.from
@@ -645,12 +424,10 @@ class VoltageMessage {
         return this.sock.sendMessage(
             jid,
             {
-                forward:
-                    this.raw
+                forward: this.raw
             }
         );
     }
-
 
     async download() {
         if (!this.body) {
@@ -665,41 +442,31 @@ class VoltageMessage {
         if (this.body.imageMessage) {
             media =
                 this.body.imageMessage;
-
-            type =
-                "image";
+            type = "image";
         } else if (
             this.body.videoMessage
         ) {
             media =
                 this.body.videoMessage;
-
-            type =
-                "video";
+            type = "video";
         } else if (
             this.body.audioMessage
         ) {
             media =
                 this.body.audioMessage;
-
-            type =
-                "audio";
+            type = "audio";
         } else if (
             this.body.documentMessage
         ) {
             media =
                 this.body.documentMessage;
-
-            type =
-                "document";
+            type = "document";
         } else if (
             this.body.stickerMessage
         ) {
             media =
                 this.body.stickerMessage;
-
-            type =
-                "sticker";
+            type = "sticker";
         }
 
         if (!media) {
@@ -728,7 +495,6 @@ class VoltageMessage {
     }
 }
 
-
 async function serializeMessage(
     sock,
     raw
@@ -737,6 +503,10 @@ async function serializeMessage(
         !raw?.message ||
         !raw?.key
     ) {
+        console.log(
+            "[Voltage] Serializer rejected message: missing message/key."
+        );
+
         return null;
     }
 
@@ -746,14 +516,30 @@ async function serializeMessage(
             raw
         );
 
+    if (
+        message.type === "unknown"
+    ) {
+        console.log(
+            "[Voltage] Unknown message structure:",
+            Object.keys(
+                message.body || {}
+            )
+        );
+
+        console.log(
+            "[Voltage] Raw message keys:",
+            Object.keys(
+                raw.message || {}
+            )
+        );
+    }
+
     if (message.isGroup) {
         await message.loadGroupMetadata();
-        await message.loadPermissions();
     }
 
     return message;
 }
-
 
 module.exports = {
     VoltageMessage,
