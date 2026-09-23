@@ -222,7 +222,8 @@ class VoltageMessage {
 
         this.isOwner =
             isOwner(
-                this.sender
+                this.sender,
+                this
             );
 
         this.isDev =
