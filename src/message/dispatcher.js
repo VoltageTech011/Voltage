@@ -14,16 +14,30 @@ const {
     generateResponse
 } = require("../ai/ai");
 
+const FOOTER =
+    "Powered by Thereal_VoltageLord";
+
 async function dispatchMessage(sock, raw) {
     console.log(
         "[Voltage] dispatchMessage() started."
     );
 
-    const message =
-        await serializeMessage(
-            sock,
-            raw
+    let message;
+
+    try {
+        message =
+            await serializeMessage(
+                sock,
+                raw
+            );
+    } catch (error) {
+        console.error(
+            "[Voltage] Serialization error:",
+            error
         );
+
+        return null;
+    }
 
     if (!message) {
         console.log(
@@ -34,25 +48,33 @@ async function dispatchMessage(sock, raw) {
     }
 
     console.log(
-        `[Voltage] Serialized message: type=${message.type} text="${message.text || ""}" sender=${message.sender || "unknown"} senderNumber=${message.senderNumber || "unknown"} owner=${message.isOwner} fromMe=${message.isFromMe}`
+        `[Voltage] Serialized message: ` +
+        `type=${message.type} ` +
+        `text="${message.text}" ` +
+        `sender=${message.sender} ` +
+        `senderNumber=${message.senderNumber} ` +
+        `owner=${message.isOwner} ` +
+        `fromMe=${message.isFromMe}`
     );
+
+    if (
+        message.type === "unknown" &&
+        !message.text
+    ) {
+        console.log(
+            "[Voltage] Ignoring unsupported/system message."
+        );
+
+        return null;
+    }
 
     const trigger =
         shouldRespond(message);
 
     console.log(
-        `[Voltage] Trigger result: respond=${trigger.respond} reason=${trigger.reason}`
-    );
-
-    console.log(
-        `[Voltage] ${
-            message.isGroup
-                ? "GROUP"
-                : "DM"
-        } ` +
-        `${message.senderNumber || "unknown"} ` +
-        `→ ${trigger.reason}: ` +
-        `${message.text || `[${message.type}]`}`
+        `[Voltage] Trigger result: ` +
+        `respond=${trigger.respond} ` +
+        `reason=${trigger.reason}`
     );
 
     if (!trigger.respond) {
@@ -65,36 +87,75 @@ async function dispatchMessage(sock, raw) {
     message.command =
         trigger.command || null;
 
+    console.log(
+        `[Voltage] ${
+            message.isGroup
+                ? "GROUP"
+                : "DM"
+        } ${message.senderNumber || "unknown"} ` +
+        `→ ${trigger.reason}: ` +
+        `${message.text || `[${message.type}]`}`
+    );
+
     /*
-     * Commands are handled before AI.
+     * COMMAND PATH
+     *
+     * Commands must be handled before AI.
      */
     if (message.command) {
         console.log(
-            `[Voltage] Dispatching command: ${message.command.name}`
+            `[Voltage] Command detected: .${message.command.name}`
         );
 
-        const handled =
-            await dispatchCommand(
-                message
+        try {
+            const handled =
+                await dispatchCommand(
+                    message
+                );
+
+            console.log(
+                `[Voltage] Command result: handled=${Boolean(handled)}`
             );
 
-        if (handled) {
+            if (handled) {
+                console.log(
+                    "[Voltage] Command handled. AI will not run."
+                );
+
+                return message;
+            }
+
             console.log(
-                `[Voltage] Command handled: ${message.command.name}`
+                "[Voltage] Command was not handled."
             );
+        } catch (error) {
+            console.error(
+                "[Voltage] Command dispatch error:",
+                error
+            );
+
+            try {
+                await message.reply(
+                    `Command error: ${
+                        error.message ||
+                        "Unable to execute command."
+                    }\n\n${FOOTER}`
+                );
+            } catch (replyError) {
+                console.error(
+                    "[Voltage] Failed to send command error:",
+                    replyError
+                );
+            }
 
             return message;
         }
-
-        console.log(
-            `[Voltage] Command was not handled: ${message.command.name}`
-        );
-
-        return message;
     }
 
     /*
-     * Normal Voltage conversation.
+     * AI PATH
+     *
+     * Only normal triggered messages reach here.
      */
     console.log(
         "[Voltage] AI trigger accepted."
@@ -110,26 +171,34 @@ async function dispatchMessage(sock, raw) {
                 message
             );
 
-        if (!result) {
+        console.log(
+            "[Voltage] AI result:",
+            {
+                success:
+                    result?.success,
+                provider:
+                    result?.provider,
+                model:
+                    result?.model,
+                type:
+                    result?.type,
+                error:
+                    result?.error
+            }
+        );
+
+        if (
+            !result ||
+            !result.success ||
+            !result.text
+        ) {
             console.error(
-                "[Voltage] AI returned no result."
+                "[Voltage] AI returned no usable response:",
+                result
             );
 
             await message.reply(
-                "I got nothing back from the AI."
-            );
-
-            return message;
-        }
-
-        if (!result.success) {
-            console.error(
-                "[Voltage] AI request failed:",
-                result.error
-            );
-
-            await message.reply(
-                "My brain just failed to respond. Try that again."
+                `My brain just failed to respond. Try that again.\n\n${FOOTER}`
             );
 
             return message;
@@ -137,35 +206,19 @@ async function dispatchMessage(sock, raw) {
 
         const response =
             String(
-                result.text || ""
+                result.text
             ).trim();
 
-        if (!response) {
-            console.error(
-                "[Voltage] AI returned an empty response."
-            );
-
-            await message.reply(
-                "The response came back empty. Try again."
-            );
-
-            return message;
-        }
-
         console.log(
-            `[Voltage] AI response received from ${result.provider || "unknown"}${result.model ? ` / ${result.model}` : ""}`
-        );
-
-        console.log(
-            `[Voltage] Replying to WhatsApp: "${response}"`
+            `[Voltage] AI response generated: "${response}"`
         );
 
         await message.reply(
-            response
+            `${response}\n\n${FOOTER}`
         );
 
         console.log(
-            "[Voltage] AI response sent successfully."
+            "[Voltage] AI response sent."
         );
 
         return message;
@@ -177,11 +230,11 @@ async function dispatchMessage(sock, raw) {
 
         try {
             await message.reply(
-                "Something broke while processing that. Try again."
+                `My brain just failed to respond. Try that again.\n\n${FOOTER}`
             );
         } catch (replyError) {
             console.error(
-                "[Voltage] Failed to send AI error reply:",
+                "[Voltage] Failed to send AI error response:",
                 replyError
             );
         }
