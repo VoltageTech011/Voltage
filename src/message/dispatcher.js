@@ -61,37 +61,36 @@ async function dispatchMessage(
         if (handled) {
             return message;
         }
-
-        return message;
     }
 
     try {
-        const response =
+        const result =
             await generateResponse(
                 message
             );
 
-        if (!response) {
-            return message;
+        if (
+            result?.success &&
+            result.text
+        ) {
+            await message.reply(
+                result.text
+            );
+        } else {
+            console.error(
+                "[Voltage] AI response failed:",
+                result?.error ||
+                "Unknown AI error."
+            );
         }
-
-        await message.reply(
-            response
-        );
-
-        return message;
     } catch (error) {
         console.error(
             "[Voltage] AI processing error:",
             error
         );
-
-        await message.reply(
-            "My brain just hit a wall. Try that again."
-        );
-
-        return message;
     }
+
+    return message;
 }
 
 module.exports = {
