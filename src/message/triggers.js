@@ -8,15 +8,6 @@ const PREFIX =
 const VOLTAGE_NAME =
     process.env.VOLTAGE_NAME || "Voltage";
 
-function hasVoltageWord(text = "") {
-    const pattern = new RegExp(
-        `\\b${escapeRegExp(VOLTAGE_NAME)}\\b`,
-        "i"
-    );
-
-    return pattern.test(text);
-}
-
 function escapeRegExp(value) {
     return String(value).replace(
         /[.*+?^${}()|[\]\\]/g,
@@ -24,19 +15,36 @@ function escapeRegExp(value) {
     );
 }
 
+function hasVoltageWord(text = "") {
+    const pattern = new RegExp(
+        `\\b${escapeRegExp(VOLTAGE_NAME)}\\b`,
+        "i"
+    );
+
+    return pattern.test(
+        String(text)
+    );
+}
+
 function isCommand(text = "") {
-    return text.trim().startsWith(PREFIX);
+    return String(text)
+        .trim()
+        .startsWith(PREFIX);
 }
 
 function getCommand(text = "") {
-    const trimmed = text.trim();
+    const trimmed =
+        String(text)
+            .trim();
 
     if (!trimmed.startsWith(PREFIX)) {
         return null;
     }
 
     const withoutPrefix =
-        trimmed.slice(PREFIX.length).trim();
+        trimmed
+            .slice(PREFIX.length)
+            .trim();
 
     if (!withoutPrefix) {
         return null;
@@ -46,16 +54,54 @@ function getCommand(text = "") {
         withoutPrefix.split(/\s+/);
 
     return {
-        name: parts[0].toLowerCase(),
-        args: parts.slice(1),
-        rawArgs: parts.slice(1).join(" "),
-        text: withoutPrefix
+        name:
+            parts[0].toLowerCase(),
+
+        args:
+            parts.slice(1),
+
+        rawArgs:
+            parts.slice(1).join(" "),
+
+        text:
+            withoutPrefix
+    };
+}
+
+function getVoltageCommand(text = "") {
+    const value =
+        String(text)
+            .trim();
+
+    const match =
+        value.match(
+            new RegExp(
+                `^${escapeRegExp(VOLTAGE_NAME)}(?:\\s+([\\s\\S]*))?$`,
+                "i"
+            )
+        );
+
+    if (!match) {
+        return null;
+    }
+
+    const rawArgs =
+        (match[1] || "").trim();
+
+    return {
+        name: "voltage",
+        args:
+            rawArgs
+                ? rawArgs.split(/\s+/)
+                : [],
+        rawArgs,
+        text: value
     };
 }
 
 function isReplyToVoltage(message) {
     const quoted =
-        message.quoted;
+        message?.quoted;
 
     if (!quoted) {
         return false;
@@ -63,15 +109,15 @@ function isReplyToVoltage(message) {
 
     const botJid =
         normalizeJid(
-            message.sock?.user?.id
+            message?.sock?.user?.id
         );
 
-    const quotedParticipant =
+    const participant =
         normalizeJid(
             quoted.participant
         );
 
-    const quotedRemote =
+    const remoteJid =
         normalizeJid(
             quoted.remoteJid
         );
@@ -79,20 +125,20 @@ function isReplyToVoltage(message) {
     return Boolean(
         botJid &&
         (
-            quotedParticipant === botJid ||
-            quotedRemote === botJid
+            participant === botJid ||
+            remoteJid === botJid
         )
     );
 }
 
 function isVoltageMentioned(message) {
-    if (!message.mentions?.length) {
+    if (!message?.mentions?.length) {
         return false;
     }
 
     const botJid =
         normalizeJid(
-            message.sock?.user?.id
+            message?.sock?.user?.id
         );
 
     if (!botJid) {
@@ -107,44 +153,68 @@ function isVoltageMentioned(message) {
 
 function shouldRespond(message) {
     const text =
-        message.text || "";
+        String(
+            message?.text || ""
+        ).trim();
 
+    if (!text) {
+        return {
+            respond: false,
+            reason: "empty"
+        };
+    }
+
+    /*
+     * Normal prefixed commands.
+     */
     if (isCommand(text)) {
+        const command =
+            getCommand(text);
+
         return {
             respond: true,
             reason: "command",
-            command: getCommand(text)
+            command
         };
     }
 
-    if (!message.isGroup) {
-        return {
-            respond: hasVoltageWord(text),
-            reason: hasVoltageWord(text)
-                ? "dm_voltage"
-                : "ignored"
-        };
-    }
+    /*
+     * Voltage without prefix.
+     *
+     * Example:
+     * Voltage hi
+     * Voltage explain this
+     */
+    const voltageCommand =
+        getVoltageCommand(text);
 
-    if (hasVoltageWord(text)) {
-        return {
-            respond: true,
-            reason: "group_voltage"
-        };
-    }
-
-    if (isVoltageMentioned(message)) {
+    if (voltageCommand) {
         return {
             respond: true,
-            reason: "mention"
+            reason: "voltage",
+            command: voltageCommand
         };
     }
 
-    if (isReplyToVoltage(message)) {
-        return {
-            respond: true,
-            reason: "reply"
-        };
+    /*
+     * Group replies / mentions.
+     *
+     * These go directly to AI.
+     */
+    if (message?.isGroup) {
+        if (isVoltageMentioned(message)) {
+            return {
+                respond: true,
+                reason: "mention"
+            };
+        }
+
+        if (isReplyToVoltage(message)) {
+            return {
+                respond: true,
+                reason: "reply"
+            };
+        }
     }
 
     return {
@@ -157,6 +227,7 @@ module.exports = {
     hasVoltageWord,
     isCommand,
     getCommand,
+    getVoltageCommand,
     isReplyToVoltage,
     isVoltageMentioned,
     shouldRespond
