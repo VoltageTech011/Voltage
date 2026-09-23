@@ -1,48 +1,127 @@
 const {
-    routeBrain
+    route
 } = require("./brainRouter");
 
-async function generateResponse(
-    message
-) {
+const {
+    buildSystemPrompt
+} = require("./prompt");
+
+async function generateResponse(message) {
     if (!message) {
-        throw new Error(
-            "AI message is required."
-        );
+        return {
+            success: false,
+            text: null,
+            error: "Message is unavailable."
+        };
     }
 
-    const text =
-        String(message.text || "")
-            .trim();
+    const prompt =
+        String(message.text || "").trim();
 
-    if (!text) {
-        return null;
+    if (!prompt) {
+        return {
+            success: false,
+            text: null,
+            error: "Empty prompt."
+        };
     }
 
-    const result =
-        await routeBrain({
-            message,
-            prompt: text
-        });
+    const systemPrompt =
+        buildSystemPrompt(message);
 
-    if (!result?.success) {
+    let type = null;
+    let mediaUrl = null;
+    let mime = null;
+
+    if (message.type === "image") {
+        type = "image";
+        mediaUrl =
+            message.mediaUrl ||
+            null;
+        mime =
+            message.mimetype ||
+            null;
+    }
+
+    if (message.type === "video") {
+        type = "video";
+        mediaUrl =
+            message.mediaUrl ||
+            null;
+        mime =
+            message.mimetype ||
+            null;
+    }
+
+    if (message.type === "audio") {
+        type = "audio";
+        mediaUrl =
+            message.mediaUrl ||
+            null;
+        mime =
+            message.mimetype ||
+            null;
+    }
+
+    if (message.type === "document") {
+        type = "document";
+        mediaUrl =
+            message.mediaUrl ||
+            null;
+        mime =
+            message.mimetype ||
+            null;
+    }
+
+    try {
+        const result =
+            await route({
+                prompt,
+                systemPrompt,
+                type,
+                mediaUrl,
+                mime
+            });
+
+        if (!result) {
+            return {
+                success: false,
+                text: null,
+                error: "Voltage received no AI response."
+            };
+        }
+
+        if (!result.success) {
+            return result;
+        }
+
+        return {
+            success: true,
+            text: String(
+                result.text || ""
+            ).trim(),
+            provider:
+                result.provider || "unknown",
+            model:
+                result.model || null,
+            type:
+                result.type || type || "text"
+        };
+    } catch (error) {
         console.error(
-            "[Voltage] AI generation failed:",
-            result?.error || "Unknown error"
+            "[Voltage] AI error:",
+            error
         );
 
-        return null;
+        return {
+            success: false,
+            text: null,
+            provider: null,
+            error:
+                error.message ||
+                "Voltage AI failed."
+        };
     }
-
-    const response =
-        String(result.text || "")
-            .trim();
-
-    if (!response) {
-        return null;
-    }
-
-    return response;
 }
 
 module.exports = {
