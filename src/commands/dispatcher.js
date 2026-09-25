@@ -1,19 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 
-const commandRegistry =
-    new Map();
+const commandRegistry = new Map();
 
 function loadCommands() {
     commandRegistry.clear();
 
-    const commandsPath =
-        __dirname;
+    const commandsPath = __dirname;
 
-    const files =
-        fs.readdirSync(
-            commandsPath
-        )
+    const files = fs
+        .readdirSync(commandsPath)
         .filter(file =>
             file.endsWith(".js") &&
             file !== "dispatcher.js"
@@ -21,26 +17,22 @@ function loadCommands() {
         .sort();
 
     for (const file of files) {
-        const filePath =
-            path.join(
-                commandsPath,
-                file
-            );
+        const filePath = path.join(
+            commandsPath,
+            file
+        );
 
         try {
             delete require.cache[
                 require.resolve(filePath)
             ];
 
-            const loaded =
-                require(filePath);
+            const loaded = require(filePath);
 
             const commands =
                 Array.isArray(loaded)
                     ? loaded
-                    : Array.isArray(
-                        loaded?.commands
-                    )
+                    : Array.isArray(loaded?.commands)
                         ? loaded.commands
                         : loaded?.command
                             ? [loaded.command]
@@ -57,9 +49,7 @@ function loadCommands() {
                 }
 
                 const normalizedName =
-                    String(
-                        command.name
-                    )
+                    String(command.name)
                         .trim()
                         .toLowerCase();
 
@@ -79,9 +69,7 @@ function loadCommands() {
                     normalizedName;
 
                 command.aliases =
-                    Array.isArray(
-                        command.aliases
-                    )
+                    Array.isArray(command.aliases)
                         ? command.aliases
                             .map(String)
                             .map(value =>
@@ -93,9 +81,7 @@ function loadCommands() {
                         : [];
 
                 command.triggers =
-                    Array.isArray(
-                        command.triggers
-                    )
+                    Array.isArray(command.triggers)
                         ? command.triggers
                             .map(String)
                             .map(value =>
@@ -107,9 +93,7 @@ function loadCommands() {
                         : [];
 
                 command.phrases =
-                    Array.isArray(
-                        command.phrases
-                    )
+                    Array.isArray(command.phrases)
                         ? command.phrases
                             .map(String)
                             .map(value =>
@@ -121,9 +105,7 @@ function loadCommands() {
                         : [];
 
                 command.keywords =
-                    Array.isArray(
-                        command.keywords
-                    )
+                    Array.isArray(command.keywords)
                         ? command.keywords
                             .map(String)
                             .map(value =>
@@ -143,7 +125,6 @@ function loadCommands() {
                     `[Voltage] Loaded command: ${normalizedName}`
                 );
             }
-
         } catch (error) {
             console.error(
                 `[Voltage] Failed to load command ${file}:`,
@@ -164,11 +145,31 @@ function getCommand(name) {
         return null;
     }
 
-    return commandRegistry.get(
+    const normalized =
         String(name)
             .trim()
-            .toLowerCase()
-    ) || null;
+            .toLowerCase();
+
+    const direct =
+        commandRegistry.get(normalized);
+
+    if (direct) {
+        return direct;
+    }
+
+    for (
+        const command
+        of commandRegistry.values()
+    ) {
+        if (
+            Array.isArray(command.aliases) &&
+            command.aliases.includes(normalized)
+        ) {
+            return command;
+        }
+    }
+
+    return null;
 }
 
 function getAllCommands() {
@@ -177,85 +178,32 @@ function getAllCommands() {
     );
 }
 
-function resolveCommandObject(value) {
-    if (!value) {
-        return null;
-    }
-
-    /*
-     * Already a real command definition.
-     */
-    if (
-        typeof value === "object" &&
-        typeof value.execute === "function"
-    ) {
-        return value;
-    }
-
-    /*
-     * Metadata produced by triggers.js:
-     *
-     * {
-     *   name,
-     *   args,
-     *   rawArgs,
-     *   text
-     * }
-     */
-    if (
-        typeof value === "object" &&
-        value.name
-    ) {
-        return getCommand(
-            value.name
-        );
-    }
-
-    /*
-     * Direct command name.
-     */
-    if (
-        typeof value === "string"
-    ) {
-        return getCommand(
-            value
-        );
-    }
-
-    return null;
-}
-
-async function dispatchCommand(
-    message
-) {
+async function dispatchCommand(message) {
     if (!message) {
         return false;
     }
 
-    const originalCommand =
+    let command =
         message.command;
 
-    if (!originalCommand) {
+    if (!command) {
         return false;
     }
 
-    /*
-     * Resolve:
-     *
-     * .ping
-     *   ↓
-     * triggers.js metadata
-     *   ↓
-     * { name: "ping" }
-     *   ↓
-     * commandRegistry
-     *   ↓
-     * actual ping command
-     */
-    const command =
-        resolveCommandObject(
-            originalCommand
-        );
+    if (
+        command.command &&
+        typeof command.command === "object"
+    ) {
+        command =
+            command.command;
+    }
+
+    if (
+        typeof command !== "object"
+    ) {
+        command =
+            getCommand(command);
+    }
 
     if (
         !command ||
@@ -268,58 +216,56 @@ async function dispatchCommand(
         return false;
     }
 
-    /*
-     * Make the actual command
-     * available to the command itself.
-     */
     message.command =
         command;
 
-    /*
-     * Preserve arguments generated
-     * by triggers.js / commandResolver.js.
-     */
-    if (
-        typeof message.args === "undefined"
+    let args = [];
+
+    if (Array.isArray(message.args)) {
+        args = message.args;
+    } else if (
+        typeof message.args === "string" &&
+        message.args.trim()
     ) {
-        if (
-            originalCommand &&
-            typeof originalCommand === "object" &&
-            Array.isArray(
-                originalCommand.args
-            )
-        ) {
-            message.args =
-                originalCommand.args;
-        } else {
-            message.args =
-                "";
-        }
+        args =
+            message.args
+                .trim()
+                .split(/\s+/);
     }
 
-    if (
-        typeof message.commandArgs === "undefined"
-    ) {
-        if (
-            originalCommand &&
-            typeof originalCommand === "object" &&
-            typeof originalCommand.rawArgs === "string"
-        ) {
-            message.commandArgs =
-                originalCommand.rawArgs;
-        } else {
-            message.commandArgs =
-                message.args;
-        }
+    let rawArgs =
+        typeof message.commandArgs === "string"
+            ? message.commandArgs.trim()
+            : "";
+
+    if (!rawArgs && args.length) {
+        rawArgs =
+            args.join(" ");
     }
+
+    message.args = args;
+    message.commandArgs = rawArgs;
 
     console.log(
         `[Voltage] Executing command: ${command.name}`
     );
 
+    console.log(
+        `[Voltage] Command args: ${JSON.stringify(args)}`
+    );
+
+    console.log(
+        `[Voltage] Command raw args: "${rawArgs}"`
+    );
+
     try {
         await command.execute(
-            message
+            message,
+            {
+                args,
+                rawArgs,
+                command
+            }
         );
 
         console.log(
@@ -327,7 +273,6 @@ async function dispatchCommand(
         );
 
         return true;
-
     } catch (error) {
         console.error(
             `[Voltage] Command "${command.name}" execution error:`,
