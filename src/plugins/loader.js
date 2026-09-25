@@ -4,6 +4,10 @@ const path = require("path");
 const registry =
     require("./registry");
 
+const SKIP_FILES = new Set([
+    "dispatcher.js"
+]);
+
 function loadCommands() {
     const directory =
         path.join(
@@ -27,6 +31,9 @@ function loadCommands() {
         fs.readdirSync(directory)
             .filter(file =>
                 file.endsWith(".js")
+            )
+            .filter(file =>
+                !SKIP_FILES.has(file)
             )
             .sort();
 
