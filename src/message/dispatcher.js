@@ -70,12 +70,8 @@ async function dispatchMessage(sock, raw) {
 
     /*
      * ==========================
-     * PREFIX COMMAND
+     * TRIGGER CHECK
      * ==========================
-     *
-     * .ping
-     * .menu
-     * .docanalyze
      */
 
     const trigger =
@@ -88,8 +84,36 @@ async function dispatchMessage(sock, raw) {
     );
 
     /*
-     * Normal prefixed command.
+     * IMPORTANT:
+     *
+     * If the trigger system says
+     * this message should not receive
+     * a response, stop processing here.
+     *
+     * This prevents Voltage from
+     * processing its own outgoing
+     * AI responses and creating an
+     * infinite response loop.
      */
+
+    if (!trigger.respond) {
+        console.log(
+            `[Voltage] Message ignored by trigger: ${trigger.reason}`
+        );
+
+        return null;
+    }
+
+    /*
+     * ==========================
+     * PREFIX COMMAND
+     * ==========================
+     *
+     * .ping
+     * .menu
+     * .ask hello
+     */
+
     if (
         trigger.reason === "command" &&
         trigger.command
@@ -99,6 +123,19 @@ async function dispatchMessage(sock, raw) {
 
         message.command =
             trigger.command;
+
+        message.args =
+            Array.isArray(
+                trigger.command.args
+            )
+                ? trigger.command.args.join(" ")
+                : String(
+                    trigger.command.rawArgs ||
+                    ""
+                );
+
+        message.commandArgs =
+            message.args;
 
         console.log(
             `[Voltage] Prefix command detected: ` +
@@ -156,9 +193,7 @@ async function dispatchMessage(sock, raw) {
      *
      * Voltage ping
      * Voltage analyze this document
-     * Voltage analyse
-     * what does this document contain
-     * give analysis
+     * Voltage ask something
      */
 
     const text =
@@ -175,11 +210,13 @@ async function dispatchMessage(sock, raw) {
     }
 
     /*
-     * Only attempt natural command
-     * resolution when the message
-     * actually addresses Voltage
-     * or is explicitly configured
-     * as a command-like request.
+     * At this point shouldRespond()
+     * has already confirmed that the
+     * message is allowed to continue.
+     *
+     * Natural command resolution is
+     * therefore only performed for
+     * Voltage-addressed messages.
      */
 
     const containsVoltage =
@@ -187,10 +224,23 @@ async function dispatchMessage(sock, raw) {
 
     if (
         !containsVoltage &&
-        message.isGroup
+        !message.isGroup
     ) {
         console.log(
-            "[Voltage] Group message does not address Voltage."
+            "[Voltage] Message is not addressed to Voltage."
+        );
+
+        return null;
+    }
+
+    if (
+        message.isGroup &&
+        !containsVoltage &&
+        trigger.reason !== "mention" &&
+        trigger.reason !== "reply"
+    ) {
+        console.log(
+            "[Voltage] Group message does not directly address Voltage."
         );
 
         return null;
@@ -200,9 +250,9 @@ async function dispatchMessage(sock, raw) {
      * Remove the Voltage trigger
      * before resolving the command.
      *
-     * Voltage analyze this document
+     * Voltage ask something
      * becomes:
-     * analyze this document
+     * ask something
      */
 
     const commandQuery =
@@ -210,6 +260,13 @@ async function dispatchMessage(sock, raw) {
             /^voltage\b[\s,:-]*/i,
             ""
         ).trim();
+
+    /*
+     * If Voltage was addressed without
+     * a command, leave it for the AI
+     * layer rather than trying to resolve
+     * an empty command.
+     */
 
     if (!commandQuery) {
         console.log(
@@ -273,11 +330,6 @@ async function dispatchMessage(sock, raw) {
 
         message.command =
             resolved.command;
-
-        /*
-         * Arguments extracted by
-         * commandResolver.js.
-         */
 
         message.args =
             resolved.args || "";
