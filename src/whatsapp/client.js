@@ -24,14 +24,21 @@ const {
     registerWhatsAppEvents
 } = require("./events");
 
-function safeStringify(value) {
+function stringifyUpdate(update) {
     try {
         return JSON.stringify(
-            value,
-            (key, val) =>
-                typeof val === "bigint"
-                    ? val.toString()
-                    : val
+            update,
+            (key, val) => {
+                if (typeof val === "bigint") {
+                    return val.toString();
+                }
+
+                if (key === "qr" && typeof val === "string") {
+                    return `[qr length ${val.length}]`;
+                }
+
+                return val;
+            }
         );
     } catch (error) {
         return "[unserializable]";
@@ -51,6 +58,7 @@ class VoltageWhatsApp {
 
         this.reconnectTimer = null;
         this.starting = false;
+        this.reconnectAttempts = 0;
 
         this.authPath = path.join(
             process.cwd(),
@@ -87,10 +95,6 @@ class VoltageWhatsApp {
             "[Voltage] Initializing WhatsApp..."
         );
 
-        console.log(
-            `[Voltage] Auth path: ${this.authPath}`
-        );
-
         try {
             if (!fs.existsSync(this.authPath)) {
                 fs.mkdirSync(
@@ -101,7 +105,7 @@ class VoltageWhatsApp {
                 );
 
                 console.log(
-                    "[Voltage] Auth directory did not exist. Created."
+                    "[Voltage] Auth directory created."
                 );
             }
 
@@ -131,11 +135,25 @@ class VoltageWhatsApp {
                 this.authPath
             );
 
-            console.log(
-                `[Voltage] creds.registered at startup: ${Boolean(
+            const registered =
+                Boolean(
                     state?.creds?.registered
-                )}`
+                );
+
+            console.log(
+                `[Voltage] creds.registered at startup: ${registered}`
             );
+
+            if (!registered && !number) {
+                console.log(
+                    "[Voltage] No registered creds and no pairing number. Deferring socket creation until pairing is requested."
+                );
+
+                this.state = "unpaired";
+                this.starting = false;
+
+                return null;
+            }
 
             let version;
 
@@ -202,14 +220,21 @@ class VoltageWhatsApp {
                 "creds.update",
                 async () => {
                     console.log(
-                        "[Voltage] creds.update event received. Saving..."
+                        "[Voltage] creds.update received. Saving..."
                     );
 
                     try {
                         await saveCreds();
 
+                        const nowRegistered =
+                            Boolean(
+                                sock?.authState
+                                    ?.creds
+                                    ?.registered
+                            );
+
                         console.log(
-                            "[Voltage] Creds saved."
+                            `[Voltage] Creds saved. registered=${nowRegistered}`
                         );
                     } catch (error) {
                         console.error(
@@ -221,11 +246,52 @@ class VoltageWhatsApp {
                 }
             );
 
+            if (number && !registered) {
+                try {
+                    console.log(
+                        `[Voltage] Requesting pairing code for ${number} (before QR)...`
+                    );
+
+                    this.pairingNumber =
+                        number;
+
+                    this.state =
+                        "waiting_for_pairing";
+
+                    const code =
+                        await sock.requestPairingCode(
+                            number
+                        );
+
+                    this.pairingCode =
+                        code;
+
+                    this.state = "pairing";
+
+                    console.log(
+                        `[Voltage] Pairing code generated: ${code}`
+                    );
+                } catch (error) {
+                    this.lastError =
+                        error.message;
+
+                    this.state = "failed";
+
+                    console.error(
+                        "[Voltage] Pairing request failed:",
+                        error?.stack ||
+                        error
+                    );
+
+                    throw error;
+                }
+            }
+
             sock.ev.on(
                 "connection.update",
                 async (update) => {
                     console.log(
-                        `[Voltage] connection.update raw: ${safeStringify(
+                        `[Voltage] connection.update raw: ${stringifyUpdate(
                             update
                         )}`
                     );
@@ -283,15 +349,8 @@ class VoltageWhatsApp {
     ) {
         const {
             connection,
-            lastDisconnect,
-            qr
+            lastDisconnect
         } = update || {};
-
-        if (qr) {
-            console.log(
-                `[Voltage] QR payload received (length ${qr.length}).`
-            );
-        }
 
         if (connection) {
             this.state =
@@ -311,14 +370,11 @@ class VoltageWhatsApp {
                 this.socket?.user?.lid ||
                 null;
 
-            this.state =
-                "connected";
+            this.state = "connected";
 
-            this.pairingCode =
-                null;
-
-            this.lastError =
-                null;
+            this.pairingCode = null;
+            this.lastError = null;
+            this.reconnectAttempts = 0;
 
             console.log(
                 `[Voltage] WhatsApp connected: ${
@@ -352,18 +408,16 @@ class VoltageWhatsApp {
                         "connection.update"
                     );
                 } catch (error) {
-                    // ignore cleanup errors
+                    // ignore
                 }
 
                 this.socket = null;
             }
 
             if (!reconnect) {
-                this.state =
-                    "logged_out";
+                this.state = "logged_out";
 
-                this.connectedNumber =
-                    null;
+                this.connectedNumber = null;
 
                 console.log(
                     "[Voltage] WhatsApp session logged out. Delete auth/ to re-pair."
@@ -372,11 +426,18 @@ class VoltageWhatsApp {
                 return;
             }
 
-            this.state =
-                "disconnected";
+            this.state = "disconnected";
 
             clearTimeout(
                 this.reconnectTimer
+            );
+
+            this.reconnectAttempts += 1;
+
+            const delay = Math.min(
+                3000 *
+                    this.reconnectAttempts,
+                30000
             );
 
             this.reconnectTimer =
@@ -384,7 +445,7 @@ class VoltageWhatsApp {
                     async () => {
                         try {
                             console.log(
-                                "[Voltage] Attempting WhatsApp reconnection..."
+                                `[Voltage] Attempting WhatsApp reconnection (attempt ${this.reconnectAttempts})...`
                             );
 
                             await this.start(
@@ -394,8 +455,7 @@ class VoltageWhatsApp {
                             this.lastError =
                                 error.message;
 
-                            this.state =
-                                "failed";
+                            this.state = "failed";
 
                             console.error(
                                 "[Voltage] Reconnection failed:",
@@ -404,7 +464,7 @@ class VoltageWhatsApp {
                             );
                         }
                     },
-                    3000
+                    delay
                 );
         }
     }
@@ -423,71 +483,37 @@ class VoltageWhatsApp {
             );
         }
 
-        if (
-            this.state === "connected"
-        ) {
+        if (this.state === "connected") {
             throw new Error(
                 "Voltage is already connected."
             );
         }
 
-        if (!this.socket) {
-            await this.start(
-                normalized
+        if (this.socket) {
+            console.log(
+                "[Voltage] Tearing down existing socket before pairing."
             );
+
+            try {
+                this.socket.end(undefined);
+            } catch (error) {
+                // ignore
+            }
+
+            this.socket = null;
+            this.state = "starting";
+            this.pairingCode = null;
         }
 
-        if (
-            this.socket?.authState?.creds
-                ?.registered
-        ) {
+        await this.start(normalized);
+
+        if (!this.pairingCode) {
             throw new Error(
-                "This session is already registered. Remove the auth session before pairing another number."
+                "Failed to generate a pairing code."
             );
         }
 
-        this.pairingNumber =
-            normalized;
-
-        this.state =
-            "waiting_for_pairing";
-
-        try {
-            console.log(
-                `[Voltage] Requesting pairing code for ${normalized}`
-            );
-
-            const code =
-                await this.socket.requestPairingCode(
-                    normalized
-                );
-
-            this.pairingCode =
-                code;
-
-            this.state =
-                "pairing";
-
-            console.log(
-                `[Voltage] Pairing code generated: ${code}`
-            );
-
-            return code;
-        } catch (error) {
-            this.lastError =
-                error.message;
-
-            this.state =
-                "failed";
-
-            console.error(
-                "[Voltage] Pairing failed:",
-                error?.stack ||
-                error
-            );
-
-            throw error;
-        }
+        return this.pairingCode;
     }
 
     getStatus() {
@@ -496,14 +522,12 @@ class VoltageWhatsApp {
                 process.env.VOLTAGE_NAME ||
                 "Voltage",
 
-            state:
-                this.state,
+            state: this.state,
 
             connected:
                 this.state === "connected",
 
-            number:
-                this.connectedNumber,
+            number: this.connectedNumber,
 
             pairingNumber:
                 this.pairingNumber,
@@ -523,18 +547,14 @@ class VoltageWhatsApp {
 
         if (this.socket) {
             try {
-                this.socket.end(
-                    undefined
-                );
+                this.socket.end(undefined);
             } catch (error) {
                 // ignore
             }
         }
 
         this.socket = null;
-
-        this.state =
-            "disconnected";
+        this.state = "disconnected";
 
         console.log(
             "[Voltage] WhatsApp stopped."
@@ -542,5 +562,4 @@ class VoltageWhatsApp {
     }
 }
 
-module.exports =
-    VoltageWhatsApp;
+module.exports = VoltageWhatsApp;
