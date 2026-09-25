@@ -1,9 +1,6 @@
 const GROQ_URL =
     "https://api.groq.com/openai/v1/chat/completions";
 
-const GROQ_API_KEY =
-    process.env.GROQ_API_KEY;
-
 const GROQ_MODEL =
     process.env.GROQ_MODEL ||
     "openai/gpt-oss-120b";
@@ -29,18 +26,12 @@ Personality:
 `.trim();
 
 async function execute(message, args = "") {
-    if (!GROQ_API_KEY) {
-        throw new Error(
-            "GROQ_API_KEY is not configured."
-        );
-    }
-
     const prompt =
         String(args || "").trim();
 
     if (!prompt) {
         return message.reply(
-            "Say what you want me to do."
+            "Say what you want me to do.\n\nPowered by Thereal_VoltageLord"
         );
     }
 
@@ -55,9 +46,6 @@ async function execute(message, args = "") {
                 method: "POST",
 
                 headers: {
-                    "Authorization":
-                        `Bearer ${GROQ_API_KEY}`,
-
                     "Content-Type":
                         "application/json"
                 },
@@ -110,7 +98,7 @@ async function execute(message, args = "") {
     }
 
     console.log(
-        `[Voltage] Groq response received.`
+        "[Voltage] Groq response received."
     );
 
     return message.reply(
