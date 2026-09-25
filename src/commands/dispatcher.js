@@ -1,8 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const commandRegistry =
-    new Map();
+const commandRegistry = new Map();
 
 let loadErrors = 0;
 
@@ -16,31 +15,19 @@ function loadCommands() {
     commandRegistry.clear();
     loadErrors = 0;
 
-    const commandsPath =
-        __dirname;
+    const commandsPath = __dirname;
 
     let files = [];
 
     try {
-        files =
-            fs.readdirSync(
-                commandsPath,
-                {
-                    withFileTypes: true
-                }
-            )
-            .filter(entry =>
-                entry.isFile()
-            )
-            .map(entry =>
-                entry.name
-            )
-            .filter(file =>
-                file.endsWith(".js")
-            )
-            .filter(file =>
-                file !== "dispatcher.js"
-            )
+        files = fs
+            .readdirSync(commandsPath, {
+                withFileTypes: true
+            })
+            .filter(entry => entry.isFile())
+            .map(entry => entry.name)
+            .filter(file => file.endsWith(".js"))
+            .filter(file => file !== "dispatcher.js")
             .sort();
     } catch (error) {
         console.error(
@@ -52,78 +39,47 @@ function loadCommands() {
     }
 
     for (const file of files) {
-        const filePath =
-            path.join(
-                commandsPath,
-                file
-            );
+        const filePath = path.join(
+            commandsPath,
+            file
+        );
 
         try {
             delete require.cache[
                 require.resolve(filePath)
             ];
 
-            const loaded =
-                require(filePath);
+            const loaded = require(filePath);
 
-            /*
-             * Supported command exports:
-             *
-             * module.exports = command
-             *
-             * module.exports = {
-             *     command
-             * }
-             *
-             * module.exports = {
-             *     commands: [...]
-             * }
-             *
-             * module.exports = [...]
-             */
             let commands = [];
 
-            if (
-                Array.isArray(loaded)
-            ) {
-                commands =
-                    loaded;
+            if (Array.isArray(loaded)) {
+                commands = loaded;
             } else if (
-                Array.isArray(
-                    loaded?.commands
-                )
+                Array.isArray(loaded?.commands)
             ) {
-                commands =
-                    loaded.commands;
+                commands = loaded.commands;
             } else if (
                 loaded?.command &&
                 typeof loaded.command === "object"
             ) {
-                commands = [
-                    loaded.command
-                ];
+                commands = [loaded.command];
             } else if (
                 loaded &&
                 typeof loaded === "object"
             ) {
-                commands = [
-                    loaded
-                ];
+                commands = [loaded];
             }
 
-            /*
-             * Nothing exported.
-             */
             if (!commands.length) {
                 console.warn(
                     `[Voltage] Skipping ${file}: no command export found.`
                 );
 
-                return;
+                continue;
             }
 
-            let validCommandFound =
-                false;
+            let validCommandFound = false;
 
             for (const command of commands) {
                 if (
@@ -133,13 +89,6 @@ function loadCommands() {
                     continue;
                 }
 
-                /*
-                 * Ignore objects that are not
-                 * actual commands.
-                 *
-                 * This prevents utility/plugin
-                 * exports from being registered.
-                 */
                 if (
                     !command.name ||
                     typeof command.execute !== "function"
@@ -147,13 +96,10 @@ function loadCommands() {
                     continue;
                 }
 
-                validCommandFound =
-                    true;
+                validCommandFound = true;
 
                 const normalizedName =
-                    normalizeName(
-                        command.name
-                    );
+                    normalizeName(command.name);
 
                 if (!normalizedName) {
                     continue;
@@ -171,40 +117,31 @@ function loadCommands() {
                     continue;
                 }
 
-                command.name =
-                    normalizedName;
+                command.name = normalizedName;
 
                 command.aliases =
-                    Array.isArray(
-                        command.aliases
-                    )
+                    Array.isArray(command.aliases)
                         ? command.aliases
                             .map(normalizeName)
                             .filter(Boolean)
                         : [];
 
                 command.triggers =
-                    Array.isArray(
-                        command.triggers
-                    )
+                    Array.isArray(command.triggers)
                         ? command.triggers
                             .map(normalizeName)
                             .filter(Boolean)
                         : [];
 
                 command.phrases =
-                    Array.isArray(
-                        command.phrases
-                    )
+                    Array.isArray(command.phrases)
                         ? command.phrases
                             .map(normalizeName)
                             .filter(Boolean)
                         : [];
 
                 command.keywords =
-                    Array.isArray(
-                        command.keywords
-                    )
+                    Array.isArray(command.keywords)
                         ? command.keywords
                             .map(normalizeName)
                             .filter(Boolean)
@@ -220,24 +157,17 @@ function loadCommands() {
                 );
             }
 
-            /*
-             * A JavaScript file that exports
-             * utilities instead of a command
-             * should not count as a failed command.
-             */
             if (!validCommandFound) {
                 console.warn(
                     `[Voltage] Skipped ${file}: no valid command found.`
                 );
             }
-
         } catch (error) {
             loadErrors++;
 
             console.error(
                 `[Voltage] Failed to load command ${file}:`,
-                error?.stack ||
-                error
+                error?.stack || error
             );
         }
     }
@@ -256,39 +186,26 @@ function loadCommands() {
 }
 
 function getCommand(name) {
-    const normalized =
-        normalizeName(name);
+    const normalized = normalizeName(name);
 
     if (!normalized) {
         return null;
     }
 
-    /*
-     * Direct command name.
-     */
     const direct =
-        commandRegistry.get(
-            normalized
-        );
+        commandRegistry.get(normalized);
 
     if (direct) {
         return direct;
     }
 
-    /*
-     * Alias lookup.
-     */
     for (
         const command
         of commandRegistry.values()
     ) {
         if (
-            Array.isArray(
-                command.aliases
-            ) &&
-            command.aliases.includes(
-                normalized
-            )
+            Array.isArray(command.aliases) &&
+            command.aliases.includes(normalized)
         ) {
             return command;
         }
@@ -308,46 +225,25 @@ async function dispatchCommand(message) {
         return false;
     }
 
-    let command =
-        message.command;
+    let command = message.command;
 
     if (!command) {
         return false;
     }
 
-    /*
-     * commandResolver may return:
-     *
-     * {
-     *     command: actualCommand,
-     *     args: "..."
-     * }
-     */
     if (
         command.command &&
         typeof command.command === "object"
     ) {
-        command =
-            command.command;
+        command = command.command;
     }
 
-    /*
-     * If only a command name was supplied,
-     * resolve it.
-     */
     if (
         typeof command !== "object"
     ) {
-        command =
-            getCommand(
-                command
-            );
+        command = getCommand(command);
     }
 
-    /*
-     * If this is still not a valid command,
-     * stop safely.
-     */
     if (
         !command ||
         typeof command.execute !== "function"
@@ -359,56 +255,24 @@ async function dispatchCommand(message) {
         return false;
     }
 
-    /*
-     * Make the actual command available
-     * to the command itself.
-     */
-    message.command =
-        command;
+    message.command = command;
 
-    /*
-     * Guarantee command argument fields.
-     *
-     * .ask what is your name
-     *
-     * should result in:
-     *
-     * message.args =
-     * [
-     *     "what",
-     *     "is",
-     *     "your",
-     *     "name"
-     * ]
-     *
-     * message.commandArgs =
-     * "what is your name"
-     */
     if (
-        typeof message.args ===
-        "undefined" ||
+        typeof message.args === "undefined" ||
         message.args === null
     ) {
         message.args = [];
     }
 
-    if (
-        !Array.isArray(
-            message.args
-        )
-    ) {
-        message.args =
-            String(
-                message.args
-            )
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean);
+    if (!Array.isArray(message.args)) {
+        message.args = String(message.args)
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
     }
 
     if (
-        typeof message.commandArgs ===
-        "undefined" ||
+        typeof message.commandArgs === "undefined" ||
         message.commandArgs === null
     ) {
         message.commandArgs =
@@ -424,12 +288,8 @@ async function dispatchCommand(message) {
         await command.execute(
             message,
             {
-                args:
-                    message.args,
-
-                rawArgs:
-                    message.commandArgs,
-
+                args: message.args,
+                rawArgs: message.commandArgs,
                 command
             }
         );
@@ -439,22 +299,16 @@ async function dispatchCommand(message) {
         );
 
         return true;
-
     } catch (error) {
         console.error(
             `[Voltage] Command "${command.name}" execution error:`,
-            error?.stack ||
-            error
+            error?.stack || error
         );
 
         throw error;
     }
 }
 
-/*
- * Load commands once when the module
- * is initialized.
- */
 loadCommands();
 
 module.exports = {
