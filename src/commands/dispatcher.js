@@ -177,6 +177,54 @@ function getAllCommands() {
     );
 }
 
+function resolveCommandObject(value) {
+    if (!value) {
+        return null;
+    }
+
+    /*
+     * Already a real command definition.
+     */
+    if (
+        typeof value === "object" &&
+        typeof value.execute === "function"
+    ) {
+        return value;
+    }
+
+    /*
+     * Metadata produced by triggers.js:
+     *
+     * {
+     *   name,
+     *   args,
+     *   rawArgs,
+     *   text
+     * }
+     */
+    if (
+        typeof value === "object" &&
+        value.name
+    ) {
+        return getCommand(
+            value.name
+        );
+    }
+
+    /*
+     * Direct command name.
+     */
+    if (
+        typeof value === "string"
+    ) {
+        return getCommand(
+            value
+        );
+    }
+
+    return null;
+}
+
 async function dispatchCommand(
     message
 ) {
@@ -184,34 +232,30 @@ async function dispatchCommand(
         return false;
     }
 
-    let command =
+    const originalCommand =
         message.command;
 
-    if (!command) {
+    if (!originalCommand) {
         return false;
     }
 
     /*
-     * The command can arrive from:
+     * Resolve:
      *
-     * 1. triggers.js
-     * 2. commandResolver.js
+     * .ping
+     *   ↓
+     * triggers.js metadata
+     *   ↓
+     * { name: "ping" }
+     *   ↓
+     * commandRegistry
+     *   ↓
+     * actual ping command
      */
-
-    if (
-        command.command &&
-        typeof command.command === "object"
-    ) {
-        command =
-            command.command;
-    }
-
-    if (
-        typeof command !== "object"
-    ) {
-        command =
-            getCommand(command);
-    }
+    const command =
+        resolveCommandObject(
+            originalCommand
+        );
 
     if (
         !command ||
@@ -225,33 +269,48 @@ async function dispatchCommand(
     }
 
     /*
-     * Make the resolved command
+     * Make the actual command
      * available to the command itself.
      */
-
     message.command =
         command;
 
     /*
-     * commandResolver.js provides
-     * extracted natural-language
-     * arguments through:
-     *
-     * resolved.args
+     * Preserve arguments generated
+     * by triggers.js / commandResolver.js.
      */
-
     if (
         typeof message.args === "undefined"
     ) {
-        message.args =
-            "";
+        if (
+            originalCommand &&
+            typeof originalCommand === "object" &&
+            Array.isArray(
+                originalCommand.args
+            )
+        ) {
+            message.args =
+                originalCommand.args;
+        } else {
+            message.args =
+                "";
+        }
     }
 
     if (
         typeof message.commandArgs === "undefined"
     ) {
-        message.commandArgs =
-            message.args;
+        if (
+            originalCommand &&
+            typeof originalCommand === "object" &&
+            typeof originalCommand.rawArgs === "string"
+        ) {
+            message.commandArgs =
+                originalCommand.rawArgs;
+        } else {
+            message.commandArgs =
+                message.args;
+        }
     }
 
     console.log(
