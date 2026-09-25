@@ -8,6 +8,7 @@ const {
 
 const P = require("pino");
 const path = require("path");
+const fs = require("fs");
 
 const {
     normalizeNumber,
@@ -23,10 +24,23 @@ const {
     registerWhatsAppEvents
 } = require("./events");
 
+function safeStringify(value) {
+    try {
+        return JSON.stringify(
+            value,
+            (key, val) =>
+                typeof val === "bigint"
+                    ? val.toString()
+                    : val
+        );
+    } catch (error) {
+        return "[unserializable]";
+    }
+}
+
 class VoltageWhatsApp {
     constructor() {
         this.socket = null;
-
         this.state = "starting";
 
         this.pairingNumber = null;
@@ -36,6 +50,7 @@ class VoltageWhatsApp {
         this.lastError = null;
 
         this.reconnectTimer = null;
+        this.starting = false;
 
         this.authPath = path.join(
             process.cwd(),
@@ -48,6 +63,14 @@ class VoltageWhatsApp {
     }
 
     async start(number = null) {
+        if (this.starting) {
+            console.log(
+                "[Voltage] start() already in progress. Skipping."
+            );
+
+            return this.socket;
+        }
+
         if (this.socket) {
             console.log(
                 "[Voltage] WhatsApp socket already exists."
@@ -56,6 +79,7 @@ class VoltageWhatsApp {
             return this.socket;
         }
 
+        this.starting = true;
         this.state = "starting";
         this.lastError = null;
 
@@ -63,38 +87,82 @@ class VoltageWhatsApp {
             "[Voltage] Initializing WhatsApp..."
         );
 
-        const {
-            state,
-            saveCreds
-        } = await useMultiFileAuthState(
-            this.authPath
+        console.log(
+            `[Voltage] Auth path: ${this.authPath}`
         );
 
-        let version;
-
         try {
-            const latest =
-                await fetchLatestBaileysVersion();
+            if (!fs.existsSync(this.authPath)) {
+                fs.mkdirSync(
+                    this.authPath,
+                    {
+                        recursive: true
+                    }
+                );
 
-            version = latest.version;
+                console.log(
+                    "[Voltage] Auth directory did not exist. Created."
+                );
+            }
+
+            let authFiles = [];
+
+            try {
+                authFiles =
+                    fs.readdirSync(
+                        this.authPath
+                    );
+            } catch (error) {
+                authFiles = [];
+            }
 
             console.log(
-                `[Voltage] Using Baileys version: ${version.join(".")}`
+                `[Voltage] Auth files present: ${
+                    authFiles.length
+                        ? authFiles.join(", ")
+                        : "(none)"
+                }`
             );
-        } catch (error) {
-            version = [
-                2,
-                3000,
-                1015901307
-            ];
+
+            const {
+                state,
+                saveCreds
+            } = await useMultiFileAuthState(
+                this.authPath
+            );
 
             console.log(
-                "[Voltage] Could not fetch latest Baileys version. Using fallback version."
+                `[Voltage] creds.registered at startup: ${Boolean(
+                    state?.creds?.registered
+                )}`
             );
-        }
 
-        try {
-            this.socket = makeWASocket({
+            let version;
+
+            try {
+                const latest =
+                    await fetchLatestBaileysVersion();
+
+                version = latest.version;
+
+                console.log(
+                    `[Voltage] Using Baileys version: ${version.join(
+                        "."
+                    )}`
+                );
+            } catch (error) {
+                version = [
+                    2,
+                    3000,
+                    1043857760
+                ];
+
+                console.log(
+                    "[Voltage] Could not fetch latest Baileys version. Using fallback."
+                );
+            }
+
+            const sock = makeWASocket({
                 version,
 
                 auth: {
@@ -124,26 +192,47 @@ class VoltageWhatsApp {
                     false
             });
 
+            this.socket = sock;
+
             console.log(
                 "[Voltage] WhatsApp socket created."
             );
 
-            this.socket.ev.on(
+            sock.ev.on(
                 "creds.update",
-                saveCreds
+                async () => {
+                    console.log(
+                        "[Voltage] creds.update event received. Saving..."
+                    );
+
+                    try {
+                        await saveCreds();
+
+                        console.log(
+                            "[Voltage] Creds saved."
+                        );
+                    } catch (error) {
+                        console.error(
+                            "[Voltage] Failed to save creds:",
+                            error?.stack ||
+                            error
+                        );
+                    }
+                }
             );
 
-            await registerWhatsAppEvents(
-                this.socket
-            );
-
-            this.socket.ev.on(
+            sock.ev.on(
                 "connection.update",
                 async (update) => {
+                    console.log(
+                        `[Voltage] connection.update raw: ${safeStringify(
+                            update
+                        )}`
+                    );
+
                     try {
                         await this.handleConnectionUpdate(
                             update,
-                            state.creds,
                             number
                         );
                     } catch (error) {
@@ -152,17 +241,22 @@ class VoltageWhatsApp {
 
                         console.error(
                             "[Voltage] Connection update error:",
+                            error?.stack ||
                             error
                         );
                     }
                 }
             );
 
+            await registerWhatsAppEvents(
+                sock
+            );
+
             console.log(
                 "[Voltage] WhatsApp events registered."
             );
 
-            return this.socket;
+            return sock;
         } catch (error) {
             this.socket = null;
 
@@ -173,22 +267,31 @@ class VoltageWhatsApp {
 
             console.error(
                 "[Voltage] Failed to create WhatsApp socket:",
+                error?.stack ||
                 error
             );
 
             throw error;
+        } finally {
+            this.starting = false;
         }
     }
 
     async handleConnectionUpdate(
         update,
-        creds,
         requestedNumber
     ) {
         const {
             connection,
-            lastDisconnect
-        } = update;
+            lastDisconnect,
+            qr
+        } = update || {};
+
+        if (qr) {
+            console.log(
+                `[Voltage] QR payload received (length ${qr.length}).`
+            );
+        }
 
         if (connection) {
             this.state =
@@ -228,16 +331,32 @@ class VoltageWhatsApp {
         }
 
         if (connection === "close") {
+            const reason =
+                lastDisconnect?.error
+                    ?.output?.statusCode;
+
             const reconnect =
                 shouldReconnect(
                     lastDisconnect
                 );
 
             console.log(
-                `[Voltage] Connection closed. Reconnect: ${reconnect}`
+                `[Voltage] Connection closed. Reason: ${
+                    reason ?? "unknown"
+                } | Reconnect: ${reconnect}`
             );
 
-            this.socket = null;
+            if (this.socket) {
+                try {
+                    this.socket.ev.removeAllListeners(
+                        "connection.update"
+                    );
+                } catch (error) {
+                    // ignore cleanup errors
+                }
+
+                this.socket = null;
+            }
 
             if (!reconnect) {
                 this.state =
@@ -247,7 +366,7 @@ class VoltageWhatsApp {
                     null;
 
                 console.log(
-                    "[Voltage] WhatsApp session logged out."
+                    "[Voltage] WhatsApp session logged out. Delete auth/ to re-pair."
                 );
 
                 return;
@@ -280,6 +399,7 @@ class VoltageWhatsApp {
 
                             console.error(
                                 "[Voltage] Reconnection failed:",
+                                error?.stack ||
                                 error
                             );
                         }
@@ -362,6 +482,7 @@ class VoltageWhatsApp {
 
             console.error(
                 "[Voltage] Pairing failed:",
+                error?.stack ||
                 error
             );
 
@@ -405,7 +526,9 @@ class VoltageWhatsApp {
                 this.socket.end(
                     undefined
                 );
-            } catch {}
+            } catch (error) {
+                // ignore
+            }
         }
 
         this.socket = null;
