@@ -1,254 +1,378 @@
 const {
-    serializeMessage
+serializeMessage
 } = require("./serializer");
 
 const {
-    shouldRespond
+shouldRespond
 } = require("./triggers");
 
 const {
-    resolveCommand
+resolveCommand
 } = require("../utils/commandResolver");
 
 const {
-    dispatchCommand,
-    commandRegistry
+dispatchCommand,
+commandRegistry,
+getCommand
 } = require("../commands/dispatcher");
 
 const FOOTER =
-    "Powered by Thereal_VoltageLord";
+"Powered by Thereal_VoltageLord";
 
 async function dispatchMessage(sock, raw) {
-    console.log(
-        "[Voltage] dispatchMessage() started."
+console.log(
+"[Voltage] dispatchMessage() started."
+);
+
+let message;
+
+try {
+    message =
+        await serializeMessage(
+            sock,
+            raw
+        );
+} catch (error) {
+    console.error(
+        "[Voltage] Serialization error:",
+        error?.stack || error
     );
 
-    let message;
+    return null;
+}
+
+if (!message) {
+    console.log(
+        "[Voltage] Serialization returned null."
+    );
+
+    return null;
+}
+
+console.log(
+    `[Voltage] Message: ` +
+    `type=${message.type} ` +
+    `text=${JSON.stringify(message.text)} ` +
+    `from=${message.sender} ` +
+    `number=${message.senderNumber} ` +
+    `fromMe=${message.isFromMe}`
+);
+
+/*
+ * Ignore protocol/system messages.
+ */
+if (
+    message.type === "protocol" ||
+    message.type === "senderKeyDistribution"
+) {
+    console.log(
+        `[Voltage] Ignoring ${message.type} message.`
+    );
+
+    return null;
+}
+
+/*
+ * Never process Voltage's own messages.
+ *
+ * This prevents infinite response loops.
+ */
+if (message.isFromMe) {
+    console.log(
+        "[Voltage] Ignoring own outgoing message."
+    );
+
+    return null;
+}
+
+const text =
+    String(
+        message.text || ""
+    ).trim();
+
+if (!text) {
+    console.log(
+        "[Voltage] Message has no usable text."
+    );
+
+    return null;
+}
+
+/*
+ * ==========================
+ * TRIGGER DETECTION
+ * ==========================
+ */
+const trigger =
+    shouldRespond(message);
+
+console.log(
+    `[Voltage] Trigger: ` +
+    `respond=${trigger.respond} ` +
+    `reason=${trigger.reason}`
+);
+
+if (!trigger.respond) {
+    console.log(
+        "[Voltage] Message ignored by trigger."
+    );
+
+    return null;
+}
+
+/*
+ * ==========================
+ * PREFIX COMMAND
+ * ==========================
+ *
+ * Examples:
+ *
+ * .ping
+ * .menu
+ * .ask what is your name
+ * .ai explain quantum computing
+ */
+if (
+    trigger.reason === "command" &&
+    trigger.command
+) {
+    const parsedCommand =
+        trigger.command;
+
+    message.trigger =
+        trigger;
+
+    /*
+     * Copy the arguments produced
+     * by triggers.js onto the message.
+     */
+    message.args =
+        Array.isArray(
+            parsedCommand.args
+        )
+            ? parsedCommand.args
+            : String(
+                parsedCommand.rawArgs ||
+                ""
+            )
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
+
+    message.commandArgs =
+        String(
+            parsedCommand.rawArgs ||
+            message.args.join(" ")
+        ).trim();
+
+    const commandName =
+        String(
+            parsedCommand.name || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    /*
+     * Resolve command names AND aliases.
+     *
+     * This is important because:
+     *
+     * .ask
+     * .ai
+     * .chat
+     *
+     * can all resolve to the same
+     * command.
+     */
+    const registeredCommand =
+        getCommand(
+            commandName
+        );
+
+    /*
+     * Unknown prefix command.
+     *
+     * Do not silently ignore it.
+     */
+    if (!registeredCommand) {
+        console.log(
+            `[Voltage] Unknown prefix command: ${commandName}`
+        );
+
+        try {
+            await message.reply(
+                `Unknown command: .${commandName}\n\n` +
+                `Use .menu to see available commands.\n\n` +
+                FOOTER
+            );
+        } catch (error) {
+            console.error(
+                "[Voltage] Failed to send unknown-command response:",
+                error?.stack || error
+            );
+        }
+
+        return message;
+    }
+
+    message.command =
+        registeredCommand;
+
+    console.log(
+        `[Voltage] Prefix command detected: ` +
+        `${registeredCommand.name} ` +
+        `args="${message.commandArgs}"`
+    );
 
     try {
-        message =
-            await serializeMessage(
-                sock,
-                raw
+        const handled =
+            await dispatchCommand(
+                message
             );
+
+        console.log(
+            `[Voltage] Command handled=${Boolean(
+                handled
+            )}`
+        );
+
+        return message;
+
     } catch (error) {
         console.error(
-            "[Voltage] Serialization error:",
+            "[Voltage] Command error:",
             error?.stack || error
         );
 
-        return null;
+        try {
+            await message.reply(
+                `Command error: ${
+                    error?.message ||
+                    "Unable to execute command."
+                }\n\n${FOOTER}`
+            );
+        } catch (replyError) {
+            console.error(
+                "[Voltage] Failed to send command error:",
+                replyError?.stack ||
+                replyError
+            );
+        }
+
+        return message;
     }
+}
 
-    if (!message) {
-        console.log(
-            "[Voltage] Serialization returned null."
-        );
+/*
+ * ==========================
+ * VOLTAGE NATURAL COMMAND
+ * ==========================
+ *
+ * Examples:
+ *
+ * Voltage hi
+ * Voltage what is your name
+ * Voltage explain quantum computing
+ * Voltage ask who created you
+ */
+if (
+    trigger.reason === "voltage"
+) {
+    const voltageCommand =
+        trigger.command;
 
-        return null;
-    }
-
-    console.log(
-        `[Voltage] Message: ` +
-        `type=${message.type} ` +
-        `text=${JSON.stringify(message.text)} ` +
-        `from=${message.sender} ` +
-        `number=${message.senderNumber} ` +
-        `fromMe=${message.isFromMe}`
-    );
-
-    /*
-     * Ignore unsupported protocol/system
-     * messages.
-     */
-    if (
-        message.type === "protocol" ||
-        message.type === "senderKeyDistribution"
-    ) {
-        console.log(
-            `[Voltage] Ignoring ${message.type} message.`
-        );
-
-        return null;
-    }
-
-    /*
-     * Never process Voltage's own outgoing
-     * messages as new commands.
-     *
-     * This prevents infinite response loops.
-     */
-    if (message.isFromMe) {
-        console.log(
-            "[Voltage] Ignoring own outgoing message."
-        );
-
-        return null;
-    }
-
-    const text =
+    const commandQuery =
         String(
-            message.text || ""
+            voltageCommand?.rawArgs ||
+            ""
         ).trim();
 
-    if (!text) {
+    /*
+     * Bare "Voltage".
+     */
+    if (!commandQuery) {
         console.log(
-            "[Voltage] Message has no usable text."
+            "[Voltage] Voltage was called without text."
         );
 
-        return null;
+        return message;
     }
-
-    /*
-     * ==========================
-     * TRIGGER DETECTION
-     * ==========================
-     */
-    const trigger =
-        shouldRespond(message);
 
     console.log(
-        `[Voltage] Trigger: ` +
-        `respond=${trigger.respond} ` +
-        `reason=${trigger.reason}`
+        `[Voltage] Natural query: "${commandQuery}"`
     );
 
-    if (!trigger.respond) {
-        console.log(
-            "[Voltage] Message ignored by trigger."
-        );
+    /*
+     * First check whether the text is
+     * actually asking for a known command.
+     *
+     * Example:
+     *
+     * Voltage ping
+     * Voltage menu
+     * Voltage status
+     */
+    let resolved = null;
 
-        return null;
+    try {
+        resolved =
+            resolveCommand(
+                commandQuery,
+                commandRegistry
+            );
+    } catch (error) {
+        console.error(
+            "[Voltage] Command resolver error:",
+            error?.stack || error
+        );
     }
 
     /*
-     * ==========================
-     * PREFIX COMMAND
-     * ==========================
-     *
-     * Examples:
-     *
-     * .ping
-     * .menu
-     * .ask what is your name
-     * .ai explain quantum computing
-     *
-     * triggers.js returns:
-     *
-     * {
-     *   name: "ask",
-     *   args: ["what", "is", "your", "name"],
-     *   rawArgs: "what is your name"
-     * }
+     * Strong command match.
      */
     if (
-        trigger.reason === "command" &&
-        trigger.command
+        resolved?.type === "match" &&
+        resolved.command
     ) {
-        const parsedCommand =
-            trigger.command;
+        message.trigger = {
+            respond: true,
+            reason: "natural_command",
+            command: resolved
+        };
 
-        message.trigger =
-            trigger;
+        message.command =
+            resolved.command;
 
-        /*
-         * Keep the actual command object
-         * separate from the parsed command
-         * information.
-         */
-        const commandName =
+        message.args =
             String(
-                parsedCommand.name || ""
+                resolved.args || ""
             )
                 .trim()
-                .toLowerCase();
-
-        /*
-         * CRITICAL:
-         *
-         * dispatchCommand() expects
-         * message.args to contain the
-         * command arguments.
-         *
-         * Previously this was not being
-         * copied from triggers.js, causing:
-         *
-         * .ask what is your name
-         *
-         * to become:
-         *
-         * ""
-         */
-        message.args =
-            Array.isArray(
-                parsedCommand.args
-            )
-                ? parsedCommand.args
-                : String(
-                    parsedCommand.rawArgs ||
-                    ""
-                )
-                    .trim()
-                    .split(/\s+/)
-                    .filter(Boolean);
+                .split(/\s+/)
+                .filter(Boolean);
 
         message.commandArgs =
             String(
-                parsedCommand.rawArgs ||
-                message.args.join(" ")
+                resolved.args || ""
             ).trim();
 
-        /*
-         * Resolve the actual registered
-         * command.
-         */
-        const registeredCommand =
-            commandRegistry.get(
-                commandName
-            );
-
-        if (!registeredCommand) {
-            console.log(
-                `[Voltage] Unknown prefix command: ${commandName}`
-            );
-
-            return null;
-        }
-
-        message.command =
-            registeredCommand;
-
         console.log(
-            `[Voltage] Prefix command detected: ` +
-            `${registeredCommand.name} ` +
+            `[Voltage] Natural command matched: ` +
+            `${resolved.name} ` +
+            `score=${resolved.score} ` +
             `args="${message.commandArgs}"`
         );
 
         try {
-            const handled =
-                await dispatchCommand(
-                    message
-                );
-
-            console.log(
-                `[Voltage] Command handled=${Boolean(
-                    handled
-                )}`
-            );
-
-            if (handled) {
-                return message;
-            }
-
-            console.log(
-                "[Voltage] Command was not handled."
+            await dispatchCommand(
+                message
             );
 
             return message;
 
         } catch (error) {
             console.error(
-                "[Voltage] Command error:",
+                "[Voltage] Natural command error:",
                 error?.stack || error
             );
 
@@ -272,249 +396,142 @@ async function dispatchMessage(sock, raw) {
     }
 
     /*
-     * ==========================
-     * VOLTAGE NATURAL COMMAND
-     * ==========================
+     * IMPORTANT:
      *
-     * Examples:
+     * If the natural text does not match
+     * a command, send the ENTIRE text to
+     * the ask command.
      *
-     * Voltage ping
-     * Voltage menu
-     * Voltage ask what is your name
      * Voltage hi
+     *       ↓
+     * ask("hi")
      *
-     * Only messages actually addressing
-     * Voltage reach this section.
+     * Voltage what is your name
+     *       ↓
+     * ask("what is your name")
+     *
+     * This fixes the previous:
+     *
+     * "Say what you want me to do."
      */
-    if (
-        trigger.reason === "voltage"
-    ) {
-        const voltageCommand =
-            trigger.command;
+    const askCommand =
+        getCommand("ask");
 
-        /*
-         * "Voltage hi"
-         *
-         * becomes:
-         *
-         * "hi"
-         */
-        const commandQuery =
-            String(
-                voltageCommand?.rawArgs ||
-                ""
-            ).trim();
-
-        if (!commandQuery) {
-            console.log(
-                "[Voltage] Voltage was called without a command."
-            );
-
-            /*
-             * If there is a dedicated
-             * Voltage/AI handler later,
-             * it can handle bare "Voltage".
-             *
-             * For now do not dispatch an
-             * empty command.
-             */
-            return message;
-        }
-
-        console.log(
-            `[Voltage] Resolving natural command: "${commandQuery}"`
+    if (!askCommand) {
+        console.error(
+            "[Voltage] Ask command is not loaded."
         );
-
-        let resolved;
 
         try {
-            resolved =
-                resolveCommand(
-                    commandQuery,
-                    commandRegistry
-                );
+            await message.reply(
+                `Voltage's AI command is currently unavailable.\n\n${FOOTER}`
+            );
         } catch (error) {
             console.error(
-                "[Voltage] Command resolver error:",
+                "[Voltage] Failed to send AI unavailable response:",
                 error?.stack || error
             );
-
-            return message;
         }
 
-        if (!resolved) {
-            console.log(
-                "[Voltage] Command resolver returned nothing."
-            );
+        return message;
+    }
 
-            return message;
-        }
-
-        console.log(
-            `[Voltage] Resolver result: ` +
-            `type=${resolved.type} ` +
-            `name=${resolved.name || "none"} ` +
-            `score=${resolved.score}`
-        );
-
-        /*
-         * ==========================
-         * STRONG NATURAL MATCH
-         * ==========================
-         */
-        if (
-            resolved.type === "match" &&
-            resolved.command
-        ) {
-            message.trigger = {
-                respond: true,
-                reason: "natural_command",
-                command: resolved
-            };
-
-            message.command =
-                resolved.command;
-
-            message.args =
-                String(
-                    resolved.args || ""
-                )
-                    .trim()
+    message.trigger = {
+        respond: true,
+        reason: "natural_ai",
+        command: {
+            name: "ask",
+            args:
+                commandQuery
                     .split(/\s+/)
-                    .filter(Boolean);
-
-            message.commandArgs =
-                String(
-                    resolved.args || ""
-                ).trim();
-
-            console.log(
-                `[Voltage] Natural command matched: ` +
-                `${resolved.name} ` +
-                `score=${resolved.score} ` +
-                `args="${message.commandArgs}"`
-            );
-
-            try {
-                const handled =
-                    await dispatchCommand(
-                        message
-                    );
-
-                console.log(
-                    `[Voltage] Natural command handled=${Boolean(
-                        handled
-                    )}`
-                );
-
-                if (handled) {
-                    return message;
-                }
-
-                console.log(
-                    "[Voltage] Natural command was not handled."
-                );
-
-            } catch (error) {
-                console.error(
-                    "[Voltage] Natural command error:",
-                    error?.stack || error
-                );
-
-                try {
-                    await message.reply(
-                        `Command error: ${
-                            error?.message ||
-                            "Unable to execute command."
-                        }\n\n${FOOTER}`
-                    );
-                } catch (replyError) {
-                    console.error(
-                        "[Voltage] Failed to send command error:",
-                        replyError?.stack ||
-                        replyError
-                    );
-                }
-            }
-
-            return message;
+                    .filter(Boolean),
+            rawArgs:
+                commandQuery
         }
+    };
 
-        /*
-         * ==========================
-         * POSSIBLE MATCH
-         * ==========================
-         *
-         * Do not execute uncertain
-         * commands automatically.
-         */
-        if (
-            resolved.type === "possible"
-        ) {
-            console.log(
-                `[Voltage] Possible command match: ` +
-                `${resolved.name} ` +
-                `score=${resolved.score}`
-            );
+    message.command =
+        askCommand;
 
-            return message;
-        }
+    message.args =
+        commandQuery
+            .split(/\s+/)
+            .filter(Boolean);
 
-        /*
-         * No natural command matched.
-         *
-         * This is intentionally left
-         * untouched so the future AI
-         * brain can handle:
-         *
-         * Voltage explain this
-         * Voltage who are you
-         * Voltage write me a song
-         */
-        console.log(
-            `[Voltage] No command matched: "${commandQuery}"`
-        );
+    message.commandArgs =
+        commandQuery;
 
-        return message;
-    }
-
-    /*
-     * ==========================
-     * GROUP MENTION / REPLY
-     * ==========================
-     *
-     * These triggers are deliberately
-     * not sent through the command
-     * resolver.
-     *
-     * The AI brain can handle them later.
-     */
-    if (
-        trigger.reason === "mention" ||
-        trigger.reason === "reply"
-    ) {
-        console.log(
-            `[Voltage] ${trigger.reason} trigger detected.`
-        );
-
-        /*
-         * AI handling can be connected
-         * here without affecting prefix
-         * command execution.
-         */
-        return message;
-    }
-
-    /*
-     * Safety fallback.
-     */
     console.log(
-        `[Voltage] No handler matched for message: "${text}"`
+        `[Voltage] Routing natural text to ask: ` +
+        `args="${message.commandArgs}"`
     );
 
+    try {
+        await dispatchCommand(
+            message
+        );
+
+        return message;
+
+    } catch (error) {
+        console.error(
+            "[Voltage] Natural AI command error:",
+            error?.stack || error
+        );
+
+        try {
+            await message.reply(
+                `Command error: ${
+                    error?.message ||
+                    "Unable to process your request."
+                }\n\n${FOOTER}`
+            );
+        } catch (replyError) {
+            console.error(
+                "[Voltage] Failed to send AI error:",
+                replyError?.stack ||
+                replyError
+            );
+        }
+
+        return message;
+    }
+}
+
+/*
+ * ==========================
+ * GROUP MENTION / REPLY
+ * ==========================
+ *
+ * These remain available for
+ * the future AI brain.
+ */
+if (
+    trigger.reason === "mention" ||
+    trigger.reason === "reply"
+) {
+    console.log(
+        `[Voltage] ${trigger.reason} trigger detected.`
+    );
+
+    /*
+     * AI handling can be connected
+     * here later.
+     */
     return message;
 }
 
+/*
+ * Safety fallback.
+ */
+console.log(
+    `[Voltage] No handler matched for message: "${text}"`
+);
+
+return message;
+
+}
+
 module.exports = {
-    dispatchMessage
+dispatchMessage
 };
